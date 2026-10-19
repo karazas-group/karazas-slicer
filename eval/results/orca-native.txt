@@ -1,0 +1,49 @@
+cube20 eq-s0 {"grams": "3.62", "mm": "1212.40", "time": "20m 59s", "ms": 436}
+cube20 eq-n45 {"grams": "3.62", "mm": "1212.40", "time": "20m 59s", "ms": 403}
+cube20 eq-org35 {"grams": "3.62", "mm": "1212.40", "time": "20m 59s", "ms": 432}
+cube20 p2s-s0 {"grams": "3.55", "mm": "1189.09", "time": "21m 1s", "ms": 375}
+cube20 p2s-org35 {"grams": "3.55", "mm": "1189.09", "time": "21m 1s", "ms": 382}
+cube20 s1-s0 {"grams": "3.97", "mm": "1330.76", "ms": 385}
+cube20 s1-org35 {"grams": "3.97", "mm": "1330.76", "ms": 373}
+cup eq-s0 {"grams": "16.54", "mm": "5545.26", "time": "52m 1s", "ms": 3519}
+cup eq-n45 {"grams": "16.53", "mm": "5543.84", "time": "53m 23s", "ms": 3556}
+cup eq-org35 {"grams": "16.54", "mm": "5545.08", "time": "52m 17s", "ms": 3665}
+cup p2s-s0 {"grams": "16.03", "mm": "5372.99", "time": "51m 7s", "ms": 3791}
+cup p2s-org35 {"grams": "16.03", "mm": "5372.99", "time": "51m 7s", "ms": 3908}
+cup s1-s0 {"grams": "16.04", "mm": "5379.13", "ms": 4846}
+cup s1-org35 {"grams": "16.04", "mm": "5379.00", "ms": 4408}
+sphere40 eq-s0 {"grams": "11.12", "mm": "3728.74", "time": "35m 11s", "ms": 2260}
+sphere40 eq-n45 {"grams": "12.22", "mm": "4098.24", "time": "37m 30s", "ms": 2617}
+sphere40 eq-org35 {"grams": "11.80", "mm": "3955.59", "time": "36m 50s", "ms": 3263}
+sphere40 p2s-s0 {"grams": "10.87", "mm": "3642.90", "time": "36m 5s", "ms": 2461}
+sphere40 p2s-org35 {"grams": "11.52", "mm": "3863.57", "time": "37m 37s", "ms": 3306}
+sphere40 s1-s0 {"grams": "12.02", "mm": "4031.69", "ms": 2837}
+sphere40 s1-org35 {"grams": "13.32", "mm": "4464.45", "ms": 3587}
+invcone eq-s0 {"grams": "5.03", "mm": "1687.33", "time": "18m 25s", "ms": 1554}
+invcone eq-n45 {"grams": "8.48", "mm": "2842.50", "time": "26m 6s", "ms": 1955}
+invcone eq-org35 {"grams": "8.16", "mm": "2737.09", "time": "33m 14s", "ms": 4880}
+invcone p2s-s0 {"grams": "4.98", "mm": "1669.15", "time": "20m 30s", "ms": 1510}
+invcone p2s-org35 {"grams": "8.11", "mm": "2719.33", "time": "34m 28s", "ms": 5790}
+invcone s1-s0 {"grams": "6.00", "mm": "2012.82", "ms": 1670}
+invcone s1-org35 {"grams": "12.00", "mm": "4022.85", "ms": 5869}
+mushroom eq-s0 {"grams": "6.36", "mm": "2132.32", "time": "29m 20s", "ms": 502}
+mushroom eq-n45 {"grams": "15.28", "mm": "5122.27", "time": "36m 54s", "ms": 635}
+mushroom eq-org35 {"grams": "12.37", "mm": "4147.51", "time": "56m 46s", "ms": 3104}
+mushroom p2s-s0 {"grams": "6.30", "mm": "2112.89", "time": "29m 32s", "ms": 542}
+mushroom p2s-org35 {"grams": "12.24", "mm": "4102.99", "time": "56m 27s", "ms": 3073}
+mushroom s1-s0 {"grams": "7.67", "mm": "2571.55", "ms": 461}
+mushroom s1-org35 {"grams": "17.73", "mm": "5944.64", "ms": 3285}
+bracket eq-s0 {"grams": "6.08", "mm": "2037.02", "time": "34m 45s", "ms": 523}
+bracket eq-n45 {"grams": "6.08", "mm": "2037.02", "time": "34m 45s", "ms": 611}
+bracket eq-org35 {"grams": "6.08", "mm": "2037.02", "time": "34m 45s", "ms": 587}
+bracket p2s-s0 {"grams": "6.22", "mm": "2087.04", "time": "36m 49s", "ms": 541}
+bracket p2s-org35 {"grams": "6.22", "mm": "2087.04", "time": "36m 49s", "ms": 604}
+bracket s1-s0 {"grams": "7.33", "mm": "2458.33", "ms": 496}
+bracket s1-org35 {"grams": "7.33", "mm": "2458.33", "ms": 398}
+benchy eq-s0 {"grams": "11.25", "mm": "3771.65", "time": "44m 53s", "ms": 8737}
+benchy eq-n45 {"grams": "18.00", "mm": "6036.49", "time": "58m 10s", "ms": 9422}
+benchy eq-org35 {"grams": "15.82", "mm": "5304.02", "time": "1h 3m 42s", "ms": 9950}
+benchy p2s-s0 {"grams": "11.15", "mm": "3737.46", "time": "45m 38s", "ms": 7264}
+benchy p2s-org35 {"grams": "15.86", "mm": "5318.24", "time": "1h 4m 50s", "ms": 8844}
+benchy s1-s0 {"grams": "12.58", "mm": "4217.39", "ms": 6586}
+benchy s1-org35 {"grams": "20.31", "mm": "6809.66", "ms": 12211}

@@ -1,0 +1,115 @@
+diff --git a/src/libslic3r/GCode.hpp b/src/libslic3r/GCode.hpp
+index 176af4c5..d98593db 100644
+--- a/src/libslic3r/GCode.hpp
++++ b/src/libslic3r/GCode.hpp
+@@ -176,7 +176,7 @@ struct LayerResult {
+     // It is used for the pressure equalizer because it needs to buffer one layer back.
+     bool        nop_layer_result { false };
+ 
+-    static LayerResult make_nop_layer_result() { return {"", std::numeric_limits<coord_t>::max(), false, false, true}; }
++    static LayerResult make_nop_layer_result() { return {"", size_t(std::numeric_limits<coord_t>::max()) /* wasm32: size_t is 32-bit */, false, false, true}; }
+ };
+ 
+ class GCode {
+diff --git a/src/libslic3r/GCode/Thumbnails.cpp b/src/libslic3r/GCode/Thumbnails.cpp
+index 526ba824..0de835ac 100644
+--- a/src/libslic3r/GCode/Thumbnails.cpp
++++ b/src/libslic3r/GCode/Thumbnails.cpp
+@@ -4,8 +4,12 @@
+ 
+ #include <boost/algorithm/string/case_conv.hpp>
+ #include <qoi/qoi.h>
++#ifndef SLIC3R_NO_JPEG
+ #include <jpeglib.h>
++#endif
++#ifndef SLIC3R_NO_JPEG
+ #include <jerror.h>
++#endif
+ #include <vector>
+ #include <boost/algorithm/string.hpp>
+ 
+@@ -52,6 +56,10 @@ std::unique_ptr<CompressedImageBuffer> compress_thumbnail_png(const ThumbnailDat
+ 
+ std::unique_ptr<CompressedImageBuffer> compress_thumbnail_jpg(const ThumbnailData& data)
+ {
++#ifdef SLIC3R_NO_JPEG
++    return compress_thumbnail_png(data); // no libjpeg in the wasm build; thumbnails are never rendered there
++#else
++
+     // Take vector of RGBA pixels and flip the image vertically
+     std::vector<unsigned char> rgba_pixels(data.pixels.size());
+     const unsigned int row_size = data.width * 4;
+@@ -96,6 +104,7 @@ std::unique_ptr<CompressedImageBuffer> compress_thumbnail_jpg(const ThumbnailDat
+     out->size = size_t(compressed_data_size);
+     ::memcpy(out->data, (const void*)compressed_data.data(), out->size);
+     return out;
++#endif
+ }
+ 
+ std::unique_ptr<CompressedImageBuffer> compress_thumbnail_qoi(const ThumbnailData &data)
+diff --git a/src/libslic3r/LocalesUtils.cpp b/src/libslic3r/LocalesUtils.cpp
+index d3210723..2c39a530 100644
+--- a/src/libslic3r/LocalesUtils.cpp
++++ b/src/libslic3r/LocalesUtils.cpp
+@@ -4,6 +4,7 @@
+     #include <charconv>
+ #endif
+ #include <stdexcept>
++#include <sstream> // wasm/libc++: was transitively included on other platforms
+ 
+ #include <fast_float/fast_float.h>
+ 
+diff --git a/src/libslic3r/Model.cpp b/src/libslic3r/Model.cpp
+index d1ca3cf8..552407df 100644
+--- a/src/libslic3r/Model.cpp
++++ b/src/libslic3r/Model.cpp
+@@ -191,6 +191,9 @@ Model Model::read_from_step(const std::string&
+                             double                                                  angle_defletion,
+                             bool                                                   is_split_compound)
+ {
++#ifdef SLIC3R_NO_STEP
++    throw Slic3r::RuntimeError("STEP import is not available in this build");
++#else
+     Model model;
+     bool result = false;
+     bool is_cb_cancel = false;
+@@ -234,6 +237,7 @@ _finished:
+         model.add_default_instances();
+ 
+     return model;
++#endif // SLIC3R_NO_STEP
+ }
+ 
+ // BBS: add part plate related logic
+diff --git a/src/libslic3r/Model.hpp b/src/libslic3r/Model.hpp
+index d8697adb..6e56f1cb 100644
+--- a/src/libslic3r/Model.hpp
++++ b/src/libslic3r/Model.hpp
+@@ -23,7 +23,13 @@
+ //BBS: add bbs 3mf
+ #include "Format/bbs_3mf.hpp"
+ //BBS: add step
++#ifndef SLIC3R_NO_STEP
+ #include "Format/STEP.hpp"
++#else
++namespace Slic3r { class Step;
++typedef std::function<void(int load_stage, int current, int total, bool& cancel)> ImportStepProgressFn;
++typedef std::function<void(bool isUtf8)> StepIsUtf8Fn; }
++#endif
+ //BBS: add stl
+ #include "Format/STL.hpp"
+ #include "Format/OBJ.hpp"
+diff --git a/src/libslic3r/Platform.cpp b/src/libslic3r/Platform.cpp
+index 33875211..4d63a485 100644
+--- a/src/libslic3r/Platform.cpp
++++ b/src/libslic3r/Platform.cpp
+@@ -82,6 +82,9 @@ void detect_platform()
+ 			::fclose(f);
+ 		}
+ 	}
++#elif defined(__EMSCRIPTEN__)
++	s_platform 		  = Platform::Unknown; // wasm build
++	s_platform_flavor = PlatformFlavor::Unknown;
+ #elif defined(__OpenBSD__)
+     BOOST_LOG_TRIVIAL(info) << "Platform: OpenBSD";
+ 	s_platform 		  = Platform::BSDUnix;
