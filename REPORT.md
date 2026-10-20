@@ -11,10 +11,9 @@ All work is in `/home/user/orca-wasm` (outside any repo). Nothing was committed 
 
 **Feasible. A wasm build was produced and it matches native output.** The probe links unmodified Orca 2.4.2 libslic3r plus a 70-line driver into one `.wasm`. It loads the flattened P2S and Ender-3 S1 profiles, slices with walls, top/bottom, sparse infill and organic tree supports at 35°, writes G-code, and runs GCodeProcessor.
 
-- **Accuracy:** on 20 of 28 reference cases, grams are **identical** to the native OrcaSlicer 2.4.2 CLI. Filament mm agrees within ±0.05%. Model print time agrees within 11 s.
-- **Two problems are still open:**
-  - `sphere40` and `benchy` crash in Arachne with "memory access out of bounds", on both printers. See §8.
-  - wasm wall time is about 2 s minimum, and about 3.5-4.5x native for organic-support jobs.
+- **Accuracy:** all 28 reference cases slice. On 24, grams are **identical** to the native OrcaSlicer 2.4.2 CLI; three differ by 0.01 g and one (Benchy, S1, organic) by 0.15 g (0.7%). Filament mm agrees within ±0.05%. Model print time agrees within 11 s on the cases where native reports it.
+- **Fixed Oct 20:** `sphere40` and `benchy` used to crash in Arachne with "memory access out of bounds". It was a 32-bit `size_t` bug in Orca's own code. See §8.
+- **Still open:** wasm wall time is about 2 s minimum, and about 3.5-4.5x native for organic-support jobs.
 - **Size:** 8.4 MB raw, **2.66 MB gzip**, before any trimming.
 - **Effort:** about **3-5 engineer-weeks** to reach a production-quality minimal port (§10).
 - **Shortcut:** the existing `three-slicer` project (§3) has already done a similar port.
@@ -190,14 +189,22 @@ Native reference: `/home/user/slicer-eval/orca/orca-results.txt`. wasm results: 
 | cup | p2s-org35 | 16.03 | **16.03** | 5372.99 | 5373.1 | 0.00% | 51m 7s | 50m 59s | 3.9 | 5.1 |
 | cup | s1-s0 | 16.04 | **16.04** | 5379.13 | 5377.9 | -0.02% | – | 1h 15m 48s | 4.8 | 10.3 |
 | cup | s1-org35 | 16.04 | **16.04** | 5379.00 | 5377.9 | -0.02% | – | 1h 15m 48s | 4.4 | 10.1 |
-| sphere40 | all 4 | 10.87–13.32 | **crash** | | | | | | | |
-| benchy | all 4 | 11.15–20.31 | **crash** | | | | | | | |
+| sphere40 | p2s-s0 | 10.87 | **10.87** | 3642.90 | 3643.7 | 0.02% | 36m 5s | | | 4.7 |
+| sphere40 | p2s-org35 | 11.52 | 11.53 | 3863.57 | 3865.3 | 0.04% | 37m 37s | | | 9.3 |
+| sphere40 | s1-s0 | 12.02 | **12.02** | 4031.69 | 4031.7 | 0.00% | – | | | 6.4 |
+| sphere40 | s1-org35 | 13.32 | 13.31 | 4464.45 | 4463.9 | -0.01% | – | | | 11.2 |
+| benchy | p2s-s0 | 11.15 | **11.15** | | 3736.8 | | | | | 14.4 |
+| benchy | p2s-org35 | 15.86 | **15.86** | | 5318.1 | | | | | 22.5 |
+| benchy | s1-s0 | 12.58 | 12.59 | | 4222.5 | | | | | 14.6 |
+| benchy | s1-org35 | 20.31 | 20.46 | | 6861.5 | | | | | 28.0 |
+
+The sphere40 and benchy rows are from the run after the Arachne fix (`results/wasm-parity.txt`); native mm for benchy is in `results/orca-native.txt`.
 
 \* Native ms comes from run.py and includes AppImage start and 3MF export.
 \** wasm wall time includes Node start, compiling 8.4 MB of wasm, and `full_print_config()`. That fixed floor is about 1.7-2 s.
 
 Notes on the results:
-- **Grams match exactly on every case that completed (20/20).**
+- **Grams match exactly on 24 of 28.** sphere40 with organic supports and benchy S1 without supports differ by 0.01 g; benchy S1 organic by 0.15 g. The wasm build gives the same numbers on every run, so this is either native varying between runs (organic supports run in parallel) or a small real difference. Re-run native to tell which.
 - The orca-results.txt S1 rows have no time because the run.py regex found no time for S1, so there is nothing to compare. The wasm S1 header times look plausible.
 - `orca_slice()` currently returns `modes[Normal].time`, which is the **total** estimated time. For the P2S that includes about 9.5 min of start-G-code prep (`cube20`: model 20m59s, total 30m33s). The shop must pick one number deliberately. `run.py` reports the "model printing time".
 - Harmless P2S log line: `update_values_to_printer_extruders_for_multiple_filaments: option filament_retract_lift_enforce not found`.
@@ -288,7 +295,10 @@ Notes on the results:
 
 ## 8. Risks and open issues
 
-1. **Arachne memory access out of bounds. Open blocker; sphere40 and benchy crash on both printers.**
+1. **Arachne memory access out of bounds. Fixed Oct 20.**
+   - Cause: `SkeletalTrapezoidation::interpolate` (inlined into `propagateBeadingsDownward`) runs `for (next_inset_idx = left.toolpath_locations.size() - 1; next_inset_idx >= 0; ...)` with a 64-bit signed `coord_t`. With an empty vector, `size() - 1` is 2^32-1 on wasm32 (32-bit `size_t`), not -1, so the loop reads index 4294967295. On 64-bit native it wraps to -1 and the loop never runs.
+   - Fix: `coord_t(left.toolpath_locations.size()) - 1`, now in `patches/orca-2.4.2-wasm.patch`. A grep of libslic3r for the same pattern (`size() - 1` into a loop counter tested `>= 0`) found no other case.
+   - The notes below are what was known before the fix.
    - Trace: `SkeletalTrapezoidation::propagateBeadingsDownward` ← `generateSegments` ← `WallToolPaths::generate` ← `FillConcentricInternal::fill_surface_extrusion` ← `Layer::make_fills` ← `PrintObject::infill()` (tbb parallel_for), on a TBB worker.
    - It persists with 4 MB TBB stacks, with `wall_generator=classic` (FillConcentricInternal still uses Arachne), and with fixed 1.5 GB memory and no growth. So it is not stack overflow or memory growth.
    - Likely another wasm32-only UB in the same family as `Print::m_origin`: an uninitialised member, a 32-bit `size_t`/`long` overflow, or OOB indexing that is benign on native 64-bit.
@@ -342,7 +352,7 @@ Goal: same profiles produce the same grams.
 | # | Step | Effort |
 |---|---|---|
 | 0 | Spike (this). Toolchain, census, link, parity on 20 cases | done |
-| 1 | Fix the Arachne OOB crash (ASan/SAFE_HEAP build; native -m32/UBSan cross-check). Sweep for other uninitialised members (Print, GCode, PrintObject) | 2-5 d |
+| 1 | Fix the Arachne OOB crash. **Done Oct 20** (32-bit `size_t` bug, §8). A sweep for other uninitialised members (Print, GCode, PrintObject) is still worth doing | done |
 | 2 | Proper `emcmake` superbuild for deps (TBB, qhull, Boost subset, deps_src libs) plus a libslic3r `EMSCRIPTEN` source filter. Reproducible Docker build | 3-4 d |
 | 3 | Trim: `SLIC3R_WASM_MINIMAL` ifdefs in Model.cpp (file readers), PresetBundle/AppConfig/Emboss out, Boost.Log null shim, PNG/thumbnail stubs. Re-measure size (target ≤2.2 MB gzip) | 2-3 d |
 | 4 | API: C entry point with embind/ccall, MEMFS mesh input (STL binary/ASCII; 3MF mesh-only via Format/3mf, or parse 3MF in JS and pass triangles), profile bundle (4 flattened combos + PETG flatten), result struct (grams, mm, model/total time, needs_support from `detect_overhangs`), cancellation and progress callback | 3-4 d |

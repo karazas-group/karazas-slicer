@@ -15,26 +15,28 @@ From the first spike (full write-up in `REPORT.md`):
 
 - Unmodified libslic3r plus a 70-line driver links into one 8.4 MB `.wasm`
   (2.66 MB gzip, before any trimming).
-- 20 of 28 test cases give the same grams as the native OrcaSlicer 2.4.2 CLI,
-  to the hundredth of a gram, on the P2S and Ender-3 S1 profiles, with and
-  without organic supports at 35°.
-- The other 8 (the 40 mm sphere and 3DBenchy, every printer and support
-  setting) crash inside Arachne with "memory access out of bounds". That's the
-  first thing to fix.
+- All 28 test cases slice. 24 give the same grams as the native OrcaSlicer
+  2.4.2 CLI, to the hundredth of a gram, on the P2S and Ender-3 S1 profiles,
+  with and without organic supports at 35°. Three are 0.01 g off, and Benchy
+  on the S1 with organic supports is 0.15 g off (0.7%).
+- The 40 mm sphere and 3DBenchy used to crash inside Arachne. That was a
+  32-bit `size_t` bug in Orca's `SkeletalTrapezoidation::interpolate`, fixed
+  in the patch (REPORT.md §8).
 - Speed: about 2 s minimum per slice, and 3.5 to 4.5 times slower than native
   on organic-support jobs (10 to 25 s for the inverted cone and mushroom).
 
 ## What's next
 
-1. Fix the Arachne crash (ASan / SAFE_HEAP build, see REPORT.md §8).
-2. Speed. The 2 s floor is mostly compiling the wasm and building the full
+1. Speed. The 2 s floor is mostly compiling the wasm and building the full
    default config, so caching the compiled module and reusing one config
    should take most of it. Then -O3, SIMD, skipping the G-code text, and
-   thread count.
-3. More printers. Profiles are flattened from Orca's own `resources/profiles`
+   thread count. Also re-run the native CLI on Benchy S1 organic to see
+   whether the 0.15 g gap is native varying between runs or a real
+   difference.
+2. More printers. Profiles are flattened from Orca's own `resources/profiles`
    with `eval/flatten.py`, so any Orca, Prusa or Bambu printer Orca ships can
    be added the same way.
-4. Later: a pricer module in the staff panel to import Orca / Prusa / Bambu
+3. Later: a pricer module in the staff panel to import Orca / Prusa / Bambu
    printer and filament profiles, flatten them on the server and publish them
    to the pricer.
 
@@ -43,15 +45,16 @@ open: preloading makes the first quote faster but costs 2 MB on limited data.
 
 ## Layout
 
-- `patches/orca-2.4.2-wasm.patch`: the six small source patches (STEP and
-  JPEG cut out, a 32-bit `size_t` fix, a missing include, the platform check).
+- `patches/orca-2.4.2-wasm.patch`: the seven small source patches (STEP and
+  JPEG cut out, two 32-bit `size_t` fixes, a missing include, the platform check).
   Apply to a clone of OrcaSlicer at tag v2.4.2.
 - `wasm/driver/`: the entry point (`orca_slice()`: STL + flattened profiles +
   `key value` overrides in, G-code and grams out) and link-time shims.
 - `wasm/cc.sh`, `wasm/deps.sh`, `wasm/link*.sh`: the spike's build scripts.
   `wasm/libslic3r-sources.txt` lists the 208 libslic3r files `cc.sh` was run on.
 - `wasm/reach.py`: works out which object files a link actually needs.
-- `eval/`: the native reference. `run.py` slices one model with the Orca CLI
+- `eval/`: the native reference. `wasm-batch.sh` runs the same 28 cases
+  through the wasm build. `run.py` slices one model with the Orca CLI
   and prints grams, `batch.sh` runs the whole matrix, `flatten.py` turns an
   Orca system preset into one flat JSON. `profiles/` has the flattened P2S and
   Ender-3 S1 machine, process and PLA files. 3DBenchy isn't included (11 MB);

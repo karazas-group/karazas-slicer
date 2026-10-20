@@ -1,36 +1,29 @@
-cube20 p2s-s0 rc=0 time_s=1833.1 filament_mm=1189.7 filament_g=3.55 wall=2.1s
-cube20 p2s-org35 rc=0 time_s=1833.1 filament_mm=1189.7 filament_g=3.55 wall=2.1s
-cube20 s1-s0 rc=0 time_s=1450.9 filament_mm=1330.6 filament_g=3.97 wall=2.1s
-cube20 s1-org35 rc=0 time_s=1450.9 filament_mm=1330.6 filament_g=3.97 wall=2.4s
-sphere40 p2s-s0 [2026-10-19 21:18:58.703000] [0x000cf5b0] [warning] update_values_to_printer_extruders_for_multiple_filaments, Line 10001: option filament_retract_lift_enforce not found, skipping wall=2.6s
-sphere40 p2s-org35 [2026-10-19 21:19:01.296000] [0x000cf5b0] [warning] update_values_to_printer_extruders_for_multiple_filaments, Line 10001: option filament_retract_lift_enforce not found, skipping wall=2.4s
-sphere40 s1-s0  wall=4.4s
-sphere40 s1-org35  wall=3.0s
-invcone p2s-s0 rc=0 time_s=1804.8 filament_mm=1669.1 filament_g=4.98 wall=2.2s
-invcone p2s-org35 rc=0 time_s=2653.0 filament_mm=2720.5 filament_g=8.11 wall=20.9s
-invcone s1-s0 rc=0 time_s=1955.3 filament_mm=2012.1 filament_g=6.00 wall=2.6s
-invcone s1-org35 rc=0 time_s=5568.2 filament_mm=4023.1 filament_g=12.00 wall=25.4s
-mushroom p2s-s0 rc=0 time_s=2345.6 filament_mm=2112.4 filament_g=6.30 wall=2.1s
-mushroom p2s-org35 rc=0 time_s=3961.7 filament_mm=4102.5 filament_g=12.24 wall=10.4s
-mushroom s1-s0 rc=0 time_s=3140.0 filament_mm=2571.6 filament_g=7.67 wall=2.3s
-mushroom s1-org35 rc=0 time_s=10244.1 filament_mm=5944.7 filament_g=17.73 wall=13.0s
-bracket p2s-s0 rc=0 time_s=2783.2 filament_mm=2086.7 filament_g=6.22 wall=2.3s
-bracket p2s-org35 rc=0 time_s=2783.2 filament_mm=2086.7 filament_g=6.22 wall=2.1s
-bracket s1-s0 rc=0 time_s=3260.4 filament_mm=2458.3 filament_g=7.33 wall=2.3s
-bracket s1-org35 rc=0 time_s=3260.4 filament_mm=2458.3 filament_g=7.33 wall=2.3s
-cup p2s-s0 rc=0 time_s=3632.7 filament_mm=5373.1 filament_g=16.03 wall=4.9s
-cup p2s-org35 rc=0 time_s=3632.7 filament_mm=5373.1 filament_g=16.03 wall=5.1s
-cup s1-s0 rc=0 time_s=4597.0 filament_mm=5377.9 filament_g=16.04 wall=10.3s
-cup s1-org35 rc=0 time_s=4597.0 filament_mm=5377.9 filament_g=16.04 wall=10.1s
-benchy p2s-s0 [2026-10-19 21:21:09.794000] [0x000cf5b0] [warning] update_values_to_printer_extruders_for_multiple_filaments, Line 10001: option filament_retract_lift_enforce not found, skipping wall=7.1s
-benchy p2s-org35 [2026-10-19 21:21:16.880000] [0x000cf5b0] [warning] update_values_to_printer_extruders_for_multiple_filaments, Line 10001: option filament_retract_lift_enforce not found, skipping wall=7.4s
-benchy s1-s0  wall=2.3s
-benchy s1-org35  wall=2.3s
-sphere40 p2s-s0 [2026-10-19 21:23:16.853000] [0x000cf5f0] [warning] update_values_to_printer_extruders_for_multiple_filaments, Line 10001: option filament_retract_lift_enforce not found, skipping wall=2.2s 
-sphere40 p2s-org35 [2026-10-19 21:23:19.052000] [0x000cf5f0] [warning] update_values_to_printer_extruders_for_multiple_filaments, Line 10001: option filament_retract_lift_enforce not found, skipping wall=2.5s 
-sphere40 s1-s0  wall=4.2s 
-sphere40 s1-org35  wall=3.8s 
-benchy p2s-s0 [2026-10-19 21:23:29.949000] [0x000cf5f0] [warning] update_values_to_printer_extruders_for_multiple_filaments, Line 10001: option filament_retract_lift_enforce not found, skipping wall=7.3s 
-benchy p2s-org35 [2026-10-19 21:23:37.200000] [0x000cf5f0] [warning] update_values_to_printer_extruders_for_multiple_filaments, Line 10001: option filament_retract_lift_enforce not found, skipping wall=6.9s 
-benchy s1-s0  wall=2.1s 
-benchy s1-org35  wall=2.5s 
+# wasm build after the Arachne fix (Oct 20, 2026), eval/wasm-batch.sh. Native numbers: orca-native.txt.
+cube20 p2s-s0 rc=0 time_s=1833.1 filament_mm=1189.7 filament_g=3.55 wall=2.2s
+cube20 p2s-org35 rc=0 time_s=1833.1 filament_mm=1189.7 filament_g=3.55 wall=2.2s
+cube20 s1-s0 rc=0 time_s=1450.9 filament_mm=1330.6 filament_g=3.97 wall=2.3s
+cube20 s1-org35 rc=0 time_s=1450.9 filament_mm=1330.6 filament_g=3.97 wall=2.1s
+cup p2s-s0 rc=0 time_s=3632.7 filament_mm=5373.1 filament_g=16.03 wall=5.6s
+cup p2s-org35 rc=0 time_s=3632.7 filament_mm=5373.1 filament_g=16.03 wall=5.3s
+cup s1-s0 rc=0 time_s=4597.0 filament_mm=5377.9 filament_g=16.04 wall=11.4s
+cup s1-org35 rc=0 time_s=4597.0 filament_mm=5377.9 filament_g=16.04 wall=10.5s
+sphere40 p2s-s0 rc=0 time_s=2739.4 filament_mm=3643.7 filament_g=10.87 wall=4.7s
+sphere40 p2s-org35 rc=0 time_s=2828.0 filament_mm=3865.3 filament_g=11.53 wall=9.3s
+sphere40 s1-s0 rc=0 time_s=3939.0 filament_mm=4031.7 filament_g=12.02 wall=6.4s
+sphere40 s1-org35 rc=0 time_s=4584.8 filament_mm=4463.9 filament_g=13.31 wall=11.2s
+invcone p2s-s0 rc=0 time_s=1804.8 filament_mm=1669.1 filament_g=4.98 wall=2.6s
+invcone p2s-org35 rc=0 time_s=2653.0 filament_mm=2720.5 filament_g=8.11 wall=21.0s
+invcone s1-s0 rc=0 time_s=1950.8 filament_mm=2012.1 filament_g=6.00 wall=2.8s
+invcone s1-org35 rc=0 time_s=5568.2 filament_mm=4023.1 filament_g=12.00 wall=24.5s
+mushroom p2s-s0 rc=0 time_s=2345.6 filament_mm=2112.4 filament_g=6.30 wall=2.2s
+mushroom p2s-org35 rc=0 time_s=3961.7 filament_mm=4102.5 filament_g=12.24 wall=10.3s
+mushroom s1-s0 rc=0 time_s=3136.1 filament_mm=2571.6 filament_g=7.67 wall=2.3s
+mushroom s1-org35 rc=0 time_s=10244.1 filament_mm=5944.7 filament_g=17.73 wall=12.1s
+bracket p2s-s0 rc=0 time_s=2783.2 filament_mm=2086.7 filament_g=6.22 wall=2.2s
+bracket p2s-org35 rc=0 time_s=2783.2 filament_mm=2086.7 filament_g=6.22 wall=2.3s
+bracket s1-s0 rc=0 time_s=3255.5 filament_mm=2458.3 filament_g=7.33 wall=2.4s
+bracket s1-org35 rc=0 time_s=3260.4 filament_mm=2458.3 filament_g=7.33 wall=2.4s
+benchy p2s-s0 rc=0 time_s=3310.3 filament_mm=3736.8 filament_g=11.15 wall=14.4s
+benchy p2s-org35 rc=0 time_s=4463.0 filament_mm=5318.1 filament_g=15.86 wall=22.5s
+benchy s1-s0 rc=0 time_s=5542.9 filament_mm=4222.5 filament_g=12.59 wall=14.6s
+benchy s1-org35 rc=0 time_s=11539.5 filament_mm=6861.5 filament_g=20.46 wall=28.0s
