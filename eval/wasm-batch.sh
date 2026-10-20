@@ -9,7 +9,7 @@ for m in cube20 cup sphere40 invcone mushroom bracket benchy; do
   for pr in p2s s1; do for sup in s0 org35; do
     extra=""; [ $sup = org35 ] && extra=$ORG
     t0=$(date +%s.%N)
-    r=$(node $JS $f "$P/$pr-machine.json;$P/$pr-process.json;$P/$pr-pla.json" $S/w.gcode $extra 2>&1 | grep -E "^rc=|RuntimeError" | head -1)
+    r=$(node $JS $f "$P/$pr-machine.json;$P/$pr-process.json;$P/$pr-pla.json" $S/w.gcode $extra 2>&1 | grep -E "^(rc=|\{\"rc\")|RuntimeError" | head -1)
     echo "$m $pr-$sup $r wall=$(printf %.1f $(echo "$(date +%s.%N)-$t0" | bc))s"
   done; done
 done
