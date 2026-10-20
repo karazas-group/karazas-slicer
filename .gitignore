@@ -1,0 +1,6 @@
+# Native Orca (AppImage extract or symlink), run.py output, logs
+eval/app
+eval/work/
+eval/*.log
+# 11 MB, from 3dbenchy.com
+eval/models/benchy.stl
