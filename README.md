@@ -22,17 +22,25 @@ From the first spike (full write-up in `REPORT.md`):
 - The 40 mm sphere and 3DBenchy used to crash inside Arachne. That was a
   32-bit `size_t` bug in Orca's `SkeletalTrapezoidation::interpolate`, fixed
   in the patch (REPORT.md §8).
-- Speed: about 2 s minimum per slice, and 3.5 to 4.5 times slower than native
-  on organic-support jobs (10 to 25 s for the inverted cone and mushroom).
+- Speed (Oct 20, 4-core box, Node): linking with mimalloc instead of the
+  default allocator cut the 28-case matrix from 240 s to 138 s with the same
+  grams. Organic supports went from 10-28 s to 4.6-12.9 s. Emscripten's
+  default allocator takes one global lock and Orca's threads allocate all
+  the time.
+- Warm slices are cheap: `kz_slice()` keeps the default config and the
+  flattened profiles between calls, and a second slice of the 20 mm cube
+  takes about 150 ms. The remaining 2 s floor is starting the runtime and
+  its four threads, which the page pays once.
+- Tried and dropped: -O3 with -msimd128. Heavy jobs were 3-7% faster but
+  small ones about 1 s slower (bigger module for each thread to load), the
+  matrix went from 138 s to 146 s, and the download grew by 320 KB gzip.
 
 ## What's next
 
-1. Speed. The 2 s floor is mostly compiling the wasm and building the full
-   default config, so caching the compiled module and reusing one config
-   should take most of it. Then -O3, SIMD, skipping the G-code text, and
-   thread count. Also re-run the native CLI on Benchy S1 organic to see
-   whether the 0.15 g gap is native varying between runs or a real
-   difference.
+1. Put it in the pricer: a Web Worker that loads the module once (on page
+   open or first model drop) and calls `kz_slice()`, the COOP/COEP headers
+   threads need, and a check in a real browser. Kiri stays as the fallback
+   until this is on dev and timed.
 2. More printers. Profiles are flattened from Orca's own `resources/profiles`
    with `eval/flatten.py`, so any Orca, Prusa or Bambu printer Orca ships can
    be added the same way.
