@@ -15,6 +15,8 @@
 #include <chrono>
 #include <vector>
 #include <emscripten.h>
+#include <emscripten/threading.h>
+#include "libslic3r/BoundingBox.hpp"
 
 using namespace Slic3r;
 // Phase timer: prints "T <phase> <ms>" to stderr so a run can be split into steps.
@@ -59,8 +61,10 @@ static int orca_slice(const char *stl_path, const char *flat_config_path, const 
         lap("start");
         Model model;
         if (!load_stl(stl_path, &model)) return -1;
-        for (ModelObject *o : model.objects) if (o->instances.empty()) o->add_instance();
-        model.center_instances_around_point(Vec2d(128, 128));
+        for (ModelObject *o : model.objects) {
+            if (o->instances.empty()) o->add_instance();
+            o->ensure_on_bed(); // a pricer upload can sit anywhere in Z
+        }
 
         lap("load_stl");
         if (int rc = load_profiles(flat_config_path)) return rc;
@@ -69,6 +73,12 @@ static int orca_slice(const char *stl_path, const char *flat_config_path, const 
             ConfigSubstitutionContext subs(ForwardCompatibilitySubstitutionRule::Enable);
             config.set_deserialize_nothrow(key, value, subs);
         }
+        // Centre the model on the bed (printable_area may be overridden, e.g. a
+        // huge bed so the pricer never refuses an oversized model).
+        BoundingBoxf bed;
+        if (auto *area = config.option<ConfigOptionPoints>("printable_area"))
+            for (const Vec2d &p : area->values) bed.merge(p);
+        model.center_instances_around_point(bed.defined ? bed.center() : Vec2d(128, 128));
         lap("profiles");
         Print print;
         // Status messages mark the steps inside process() and export.
@@ -103,6 +113,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char *kz_slice(const char *stl_path, const
     // oneTBB on emscripten defaults worker stacks to __TBB_EMSCRIPTEN_STACK_SIZE = 64 KB (onetbb cmake/compilers/Clang.cmake:21),
     // which Arachne's recursive SkeletalTrapezoidation::propagateBeadingsDownward overflows silently -> heap corruption.
     static tbb::global_control stack_ctl(tbb::global_control::thread_stack_size, 4u << 20);
+    // TBB must not want more threads than the pthread pool has (PTHREAD_POOL_SIZE
+    // uses the same 2..4 clamp); a blocked caller can't grow the pool, so more
+    // would deadlock.
+    static tbb::global_control threads_ctl(tbb::global_control::max_allowed_parallelism,
+                                           std::clamp(emscripten_num_logical_cores(), 2, 4));
     Overrides kv;
     std::string o = overrides ? overrides : "";
     for (size_t pos = 0; pos < o.size();) {

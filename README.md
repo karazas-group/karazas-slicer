@@ -37,10 +37,11 @@ From the first spike (full write-up in `REPORT.md`):
 
 ## What's next
 
-1. Put it in the pricer: a Web Worker that loads the module once (on page
-   open or first model drop) and calls `kz_slice()`, the COOP/COEP headers
-   threads need, and a check in a real browser. Kiri stays as the fallback
-   until this is on dev and timed.
+1. It's in the dev pricer behind `/3d/pricer?slicer=orca` (Karazas-website
+   edeb532), built with `wasm/link_web.sh`. Same grams as Node in headless
+   Chromium; Benchy takes 7.2 s, smaller models 0.5 to 2.2 s. Before it
+   becomes the default: get the download under 2 MB (1.9 MB at brotli 11
+   now, 2.5 MB at Cloudflare's usual level) and time startup on a phone.
 2. More printers. Profiles are flattened from Orca's own `resources/profiles`
    with `eval/flatten.py`, so any Orca, Prusa or Bambu printer Orca ships can
    be added the same way.
