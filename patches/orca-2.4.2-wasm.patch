@@ -126,3 +126,45 @@ index 33875211..4d63a485 100644
  #elif defined(__OpenBSD__)
      BOOST_LOG_TRIVIAL(info) << "Platform: OpenBSD";
  	s_platform 		  = Platform::BSDUnix;
+diff --git a/src/libslic3r/Print.cpp b/src/libslic3r/Print.cpp
+index e25ef7db..c2c9e855 100644
+--- a/src/libslic3r/Print.cpp
++++ b/src/libslic3r/Print.cpp
+@@ -2617,6 +2617,11 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
+ // It is up to the caller to show an error message.
+ std::string Print::export_gcode(const std::string& path_template, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
+ {
++#ifdef KZ_NO_GCODE
++    // Karaza slicer (pricing build): reads the toolpaths after process() and
++    // never writes G-code, so the writer and its processor aren't linked.
++    throw Slic3r::RuntimeError("This build does not write G-code");
++#else
+     // output everything to a G-code file
+     // The following call may die if the filename_format template substitution fails.
+     std::string path = this->output_filepath(path_template);
+@@ -2641,6 +2646,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
+     if (result != nullptr)
+         result->conflict_result = m_conflict_result;
+     return path.c_str();
++#endif
+ }
+ 
+ void Print::_make_skirt()
+@@ -3756,6 +3762,9 @@ void Print::set_gcode_file_invalidated()
+ //BBS: add gcode file preload logic
+ void Print::export_gcode_from_previous_file(const std::string& file, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
+ {
++#ifdef KZ_NO_GCODE
++    throw Slic3r::RuntimeError("This build does not read G-code");
++#else
+     try {
+         GCodeProcessor processor;
+         GCodeProcessor::s_IsBBLPrinter = is_BBL_printer();
+@@ -3772,6 +3781,7 @@ void Print::export_gcode_from_previous_file(const std::string& file, GCodeProces
+     }
+ 
+     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ <<  boost::format(":  process the G-code file %1% successfully")%file.c_str();
++#endif
+ }
+ 
+ std::tuple<float, float> Print::object_skirt_offset(double margin_height) const

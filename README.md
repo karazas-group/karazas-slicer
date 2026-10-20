@@ -2,8 +2,8 @@
 
 OrcaSlicer's slicing core (libslic3r, v2.4.2) compiled to WebAssembly, so the
 3D pricer can slice a customer's model in their browser with the same engine
-and the same profiles the shop prints with. It replaces Kiri:Moto, which the
-pricer uses today.
+and the same profiles the shop prints with. It replaced Kiri:Moto in the pricer
+on 2026-10-20.
 
 This branch has no history in common with the website. It's here because the
 session that started it couldn't create a separate repo. Move it to its own
@@ -31,17 +31,24 @@ From the first spike (full write-up in `REPORT.md`):
   flattened profiles between calls, and a second slice of the 20 mm cube
   takes about 150 ms. The remaining 2 s floor is starting the runtime and
   its four threads, which the page pays once.
+- Pricing build (Oct 20): 6.5 MB raw, 2.0 MB gzip, 1.42 MB brotli 11. It
+  stops after `Print::process()` and sums the plastic in the toolpaths with
+  the flow ratios `GCode::_extrude` applies, instead of writing G-code. On
+  16 cases (8 models, supports on/off) that's within 0.007 g of Orca's own
+  G-code totals, and slices are 27-70% faster (Benchy 6.2 s to 4.0 s in
+  Node). File readers, presets, the G-code writer and parser, the prime
+  tower and the template parser are replaced by stand-ins in
+  `wasm/driver/` so the linker leaves them out. `hollowbox40.stl` fails in
+  `load_stl` (also before the trim); not looked into.
 - Tried and dropped: -O3 with -msimd128. Heavy jobs were 3-7% faster but
   small ones about 1 s slower (bigger module for each thread to load), the
   matrix went from 138 s to 146 s, and the download grew by 320 KB gzip.
 
 ## What's next
 
-1. It's in the dev pricer behind `/3d/pricer?slicer=orca` (Karazas-website
-   edeb532), built with `wasm/link_web.sh`. Same grams as Node in headless
-   Chromium; Benchy takes 7.2 s, smaller models 0.5 to 2.2 s. Before it
-   becomes the default: get the download under 2 MB (1.9 MB at brotli 11
-   now, 2.5 MB at Cloudflare's usual level) and time startup on a phone.
+1. It's the dev pricer's slicer (Karazas-website 72fadf0). Same grams as
+   Node in headless Chromium; Benchy takes 6.1 s, smaller models 0.2 to
+   1.6 s. Still to do: time startup on a phone.
 2. More printers. Profiles are flattened from Orca's own `resources/profiles`
    with `eval/flatten.py`, so any Orca, Prusa or Bambu printer Orca ships can
    be added the same way.
@@ -54,11 +61,14 @@ open: preloading makes the first quote faster but costs 2 MB on limited data.
 
 ## Layout
 
-- `patches/orca-2.4.2-wasm.patch`: the seven small source patches (STEP and
-  JPEG cut out, two 32-bit `size_t` fixes, a missing include, the platform check).
+- `patches/orca-2.4.2-wasm.patch`: the small source patches (STEP and
+  JPEG cut out, two 32-bit `size_t` fixes, a missing include, the platform
+  check, and `KZ_NO_GCODE` guards on G-code export in Print.cpp).
   Apply to a clone of OrcaSlicer at tag v2.4.2.
-- `wasm/driver/`: the entry point (`orca_slice()`: STL + flattened profiles +
-  `key value` overrides in, G-code and grams out) and link-time shims.
+- `wasm/driver/`: the entry point (`kz_slice()`: STL + flattened profiles +
+  `key value` overrides in, grams out; `-DKZ_GCODE` also writes G-code) and
+  the link-time stand-ins. `wasm/roots.sh` compiles them, `wasm/link_web.sh`
+  links the pricer's build, `wasm/link_check.sh` the validation build.
 - `wasm/cc.sh`, `wasm/deps.sh`, `wasm/link*.sh`: the spike's build scripts.
   `wasm/libslic3r-sources.txt` lists the 208 libslic3r files `cc.sh` was run on.
 - `wasm/reach.py`: works out which object files a link actually needs.

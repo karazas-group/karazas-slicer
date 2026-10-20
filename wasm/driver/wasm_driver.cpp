@@ -5,7 +5,11 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/Format/STL.hpp"
+#include "libslic3r/Layer.hpp"
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#ifdef KZ_GCODE
 #include "libslic3r/GCode/GCodeProcessor.hpp"
+#endif
 #include <tbb/global_control.h>
 #include <cstdio>
 #include <cstdlib>
@@ -54,6 +58,95 @@ static int load_profiles(const std::string &paths)
     return 0;
 }
 
+
+// Filament the print lays down, in mm^3, summed from the toolpaths that
+// Print::process() leaves behind, with the same flow multipliers G-code
+// export applies (GCode::_extrude). Writing and re-parsing the G-code would
+// give the same total plus the start G-code purge, at 30-75% of the slice
+// time and about a megabyte of code the pricer never needs.
+struct FlowRatios {
+    const PrintObjectConfig &oc;
+    const PrintRegionConfig *rc; // support, skirt and brim use the object's first region
+    bool first_layer = false;
+};
+
+static double path_volume(const ExtrusionPath &path, const FlowRatios &f)
+{
+    const PrintRegionConfig &c = *f.rc;
+    const ExtrusionRole role = path.role();
+    double k = c.print_flow_ratio.value;
+    if (role == erTopSolidInfill) k *= c.top_solid_infill_flow_ratio.value;
+    else if (role == erBottomSurface) k *= c.bottom_solid_infill_flow_ratio.value;
+    else if (role == erInternalBridgeInfill) k *= c.internal_bridge_flow.value;
+    else if (role == erBrim) k *= f.oc.brim_flow_ratio.value;
+    if (f.oc.set_other_flow_ratios.value) {
+        switch (role) {
+        case erExternalPerimeter:        k *= c.outer_wall_flow_ratio.value; break;
+        case erPerimeter:                k *= c.inner_wall_flow_ratio.value; break;
+        case erOverhangPerimeter:        k *= c.overhang_flow_ratio.value; break;
+        case erInternalInfill:           k *= c.sparse_infill_flow_ratio.value; break;
+        case erSolidInfill:              k *= c.internal_solid_infill_flow_ratio.value; break;
+        case erGapFill:                  k *= c.gap_fill_flow_ratio.value; break;
+        case erSupportMaterial:          k *= f.oc.support_flow_ratio.value; break;
+        case erSupportMaterialInterface: k *= f.oc.support_interface_flow_ratio.value; break;
+        default: break;
+        }
+        if (f.first_layer && role != erBrim && role != erSkirt) k *= c.first_layer_flow_ratio.value;
+    }
+    return path.mm3_per_mm * unscale<double>(path.length()) * k;
+}
+
+static double entity_volume(const ExtrusionEntity *e, const FlowRatios &f)
+{
+    if (auto *c = dynamic_cast<const ExtrusionEntityCollection *>(e)) {
+        double v = 0;
+        for (const ExtrusionEntity *x : c->entities) v += entity_volume(x, f);
+        return v;
+    }
+    if (auto *l = dynamic_cast<const ExtrusionLoop *>(e)) {
+        double v = 0;
+        for (const ExtrusionPath &p : l->paths) v += path_volume(p, f);
+        return v;
+    }
+    if (auto *m = dynamic_cast<const ExtrusionMultiPath *>(e)) {
+        double v = 0;
+        for (const ExtrusionPath &p : m->paths) v += path_volume(p, f);
+        return v;
+    }
+    if (auto *p = dynamic_cast<const ExtrusionPath *>(e)) return path_volume(*p, f);
+    return 0;
+}
+
+static double extruded_volume(Print &print)
+{
+    double total = 0;
+    for (const PrintObject *obj : print.objects()) {
+        if (!obj->num_printing_regions()) continue;
+        double v = 0;
+        FlowRatios f{obj->config(), &obj->printing_region(0).config()};
+        for (const Layer *layer : obj->layers()) {
+            f.first_layer = layer->id() == 0;
+            for (const LayerRegion *layerm : layer->regions()) {
+                f.rc = &layerm->region().config();
+                v += entity_volume(&layerm->perimeters, f) + entity_volume(&layerm->fills, f);
+            }
+        }
+        f.rc = &obj->printing_region(0).config();
+        for (const SupportLayer *layer : obj->support_layers()) {
+            f.first_layer = layer->id() == 0;
+            v += entity_volume(&layer->support_fills, f);
+        }
+        total += v * obj->instances().size();
+    }
+    if (!print.objects().empty() && print.objects().front()->num_printing_regions()) {
+        const PrintObject *obj = print.objects().front();
+        FlowRatios f{obj->config(), &obj->printing_region(0).config()};
+        total += entity_volume(&print.skirt(), f);
+        for (auto &[id, brim] : print.get_brimMap()) total += entity_volume(&brim, f);
+    }
+    return total;
+}
+
 static int orca_slice(const char *stl_path, const char *flat_config_path, const Overrides &overrides, const char *gcode_out,
                       double *out_time_s, double *out_filament_mm, double *out_filament_g)
 {
@@ -83,6 +176,9 @@ static int orca_slice(const char *stl_path, const char *flat_config_path, const 
         Print print;
         // Status messages mark the steps inside process() and export.
         print.set_status_callback([](const PrintBase::SlicingStatus &st) { if (!st.text.empty()) lap(("~" + st.text).c_str()); });
+        // Skips the "supports look necessary" warning and the check for
+        // objects colliding with each other; neither changes the toolpaths.
+        print.set_no_check_flag(true);
         print.set_plate_origin(Vec3d::Zero()); // Print::m_origin is an uninitialised Eigen Vec3d (Print.hpp:1192); GUI/CLI set it via PartPlate
         print.apply(model, config);
         StringObjectException err = print.validate();
@@ -90,14 +186,25 @@ static int orca_slice(const char *stl_path, const char *flat_config_path, const 
         lap("apply_validate");
         print.process();
         lap("process");
+        // Every filament in the profile shares the first one's flow ratio,
+        // diameter and density: the pricer prints one material at a time.
+        const PrintConfig &pc = print.config();
+        const double area = M_PI * sqr(0.5 * pc.filament_diameter.get_at(0));
+        const double volume = extruded_volume(print) * pc.filament_flow_ratio.get_at(0);
+        lap("sum");
+        *out_filament_mm = volume / area;
+        *out_filament_g  = volume * pc.filament_density.get_at(0) * 0.001;
+        *out_time_s      = 0;
+#ifdef KZ_GCODE
+        // Validation build: also export the G-code, and report Orca's own
+        // numbers alongside, so the sum can be checked against them.
         GCodeProcessorResult result;
         print.export_gcode(gcode_out, &result, nullptr);
         lap("export_gcode");
-
         const auto &ps = print.print_statistics();
-        *out_time_s      = result.print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].time;
-        *out_filament_mm = ps.total_used_filament;
-        *out_filament_g  = ps.total_weight;
+        std::fprintf(stderr, "CHECK sum_mm %.2f gcode_mm %.2f sum_g %.3f gcode_g %.3f\n", *out_filament_mm, ps.total_used_filament, *out_filament_g, ps.total_weight);
+        *out_time_s = result.print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].time;
+#endif
         return 0;
     } catch (const std::exception &e) {
         std::fprintf(stderr, "orca_slice failed: %s\n", e.what());
