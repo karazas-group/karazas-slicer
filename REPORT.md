@@ -267,6 +267,8 @@ Notes on the results:
   - Option 2: a 100-line serial TBB shim (three-slicer's approach).
   - No COOP/COEP needed, simpler hosting, smaller glue.
 
+**Update Oct 20:** mimalloc (`-sMALLOC=mimalloc`) took the matrix from 240 s to 138 s, organic supports 2-3.5x faster, same grams on all 28. -O3 with -msimd128 made it slower overall (146 s) and bigger, so it stays -O2. A warm slice in a loaded module (cube20) is about 150 ms. Results: `eval/results/wasm-mimalloc.txt`. Native Orca re-run three times on Benchy S1 organic gives 20.31 g every time, so the wasm's 20.46 g is a real difference, probably libm rounding amplified by organic supports; not chased yet.
+
 **Speed (measured and estimated):**
 - Measured, 4-thread wasm in Node vs native Orca on the same 4-core box:
   - Light jobs: about 2.1-2.6 s, dominated by about 1.7-2 s of fixed start-up. In a browser with a cached, pre-compiled module (`WebAssembly.compileStreaming` plus keeping the worker alive), the fixed cost is paid once per page view, not per quote.
