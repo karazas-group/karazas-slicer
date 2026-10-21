@@ -38,8 +38,15 @@ From the first spike (full write-up in `REPORT.md`):
   G-code totals, and slices are 27-70% faster (Benchy 6.2 s to 4.0 s in
   Node). File readers, presets, the G-code writer and parser, the prime
   tower and the template parser are replaced by stand-ins in
-  `wasm/driver/` so the linker leaves them out. `hollowbox40.stl` fails in
-  `load_stl` (also before the trim); not looked into.
+  `wasm/driver/` so the linker leaves them out.
+- `hollowbox40.stl` loads now (Oct 21). admesh decides binary vs ASCII by
+  looking for a byte above 127 in the first 128 bytes after the header; a
+  binary STL with zero normals and round coordinates has none, so it was
+  parsed as ASCII and failed. The pricer writes zero normals, so any such
+  model hit it. Native Orca 2.4.2 fails on the same file. The patch now
+  also calls a file binary when the facet count in its header gives its
+  exact size. Same grams as native (fed an ASCII copy) on all 4 cases, and
+  the other 28 cases are unchanged to 0.001 g.
 - Tried and dropped: -O3 with -msimd128. Heavy jobs were 3-7% faster but
   small ones about 1 s slower (bigger module for each thread to load), the
   matrix went from 138 s to 146 s, and the download grew by 320 KB gzip.
@@ -63,7 +70,9 @@ open: preloading makes the first quote faster but costs 2 MB on limited data.
 
 - `patches/orca-2.4.2-wasm.patch`: the small source patches (STEP and
   JPEG cut out, two 32-bit `size_t` fixes, a missing include, the platform
-  check, and `KZ_NO_GCODE` guards on G-code export in Print.cpp).
+  check, `KZ_NO_GCODE` guards on G-code export in Print.cpp, and admesh's
+  binary STL detection). The admesh fix is in `deps.sh`'s objects
+  (`libdeps.a`), not libslic3r.
   Apply to a clone of OrcaSlicer at tag v2.4.2.
 - `wasm/driver/`: the entry point (`kz_slice()`: STL + flattened profiles +
   `key value` overrides in, grams out; `-DKZ_GCODE` also writes G-code) and
