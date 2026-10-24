@@ -1,3 +1,93 @@
+diff --git a/deps_src/admesh/stlinit.cpp b/deps_src/admesh/stlinit.cpp
+index a69bd549..c2d8696f 100644
+--- a/deps_src/admesh/stlinit.cpp
++++ b/deps_src/admesh/stlinit.cpp
+@@ -75,6 +75,22 @@ static FILE *stl_open_count_facets(stl_file *stl, const char *file, unsigned int
+       		break;
+     	}
+   	}
++	// A binary file whose first facets hold only zero normals and round
++	// coordinates (0, 2, 40...) has no byte above 127 there and was taken
++	// for ASCII, then failed to parse. If the facet count after the header
++	// accounts for the exact file size, it is binary: in an ASCII file those
++	// four bytes are text, which reads as hundreds of millions of facets.
++	if (stl->stats.type == ascii) {
++		uint32_t n = 0;
++		fseek(fp, custom_header_length, SEEK_SET);
++		bool read = fread(&n, sizeof(n), 1, fp) == 1;
++#if BOOST_ENDIAN_BIG_BYTE
++		stl_internal_reverse_quads((char*)&n, 4);
++#endif /* BOOST_ENDIAN_BIG_BYTE */
++		if (read && n > 0 &&
++		    int64_t(file_size) == int64_t(header_size) + int64_t(n) * SIZEOF_STL_FACET)
++			stl->stats.type = binary;
++	}
+   	rewind(fp);
+ 
+   	uint32_t num_facets = 0;
+diff --git a/deps_src/clipper/clipper.cpp b/deps_src/clipper/clipper.cpp
+index 1f16446a..73b564d9 100644
+--- a/deps_src/clipper/clipper.cpp
++++ b/deps_src/clipper/clipper.cpp
+@@ -3609,6 +3609,21 @@ void ClipperOffset::DoOffset(double delta)
+     else
+       m_normals.emplace_back(DoublePoint(m_normals[len - 2]));
+ 
++    // Karaza: a curve sampled every few microns has thousands of almost flat concave corners
++    // (rounding to whole nanometres makes it zigzag). Each one gets a spike back to the vertex,
++    // as long as the offset, and the union that cleans them up goes quadratic: 0.5 s for one
++    // 10k point shrink on 3DBenchy. Clipper2 leaves that point out at flat corners (#405); we do
++    // it only on such paths, so ordinary ones give exactly what native OrcaSlicer gives.
++    m_skipFlatSpikes = false;
++    if (node.m_endtype == etClosedPolygon && len >= KZ_FLAT_SPIKES) {
++      int flat = 0;
++      for (int j = 0, k = len - 1; j < len; k = j ++)
++        if ((m_normals[k].x() * m_normals[j].y() - m_normals[j].x() * m_normals[k].y()) * delta <= -1. &&
++            m_normals[k].x() * m_normals[j].x() + m_normals[j].y() * m_normals[k].y() >= KZ_FLAT_COS)
++          ++ flat;
++      m_skipFlatSpikes = flat >= KZ_FLAT_SPIKES;
++    }
++
+     if (node.m_endtype == etClosedPolygon)
+     {
+       int k = len - 1;
+@@ -3713,7 +3728,9 @@ void ClipperOffset::OffsetPoint(int j, int& k, JoinType jointype)
+   {
+     m_destPoly.emplace_back(IntPoint2d(Round<cInt>(m_srcPoly[j].x() + m_normals[k].x() * m_delta),
+       Round<cInt>(m_srcPoly[j].y() + m_normals[k].y() * m_delta)));
+-    m_destPoly.emplace_back(m_srcPoly[j]);
++    // Karaza: the point back at the vertex makes a spike as long as the offset. See DoOffset.
++    if (! m_skipFlatSpikes || m_normals[k].x() * m_normals[j].x() + m_normals[j].y() * m_normals[k].y() < KZ_FLAT_COS)
++      m_destPoly.emplace_back(m_srcPoly[j]);
+     m_destPoly.emplace_back(IntPoint2d(Round<cInt>(m_srcPoly[j].x() + m_normals[j].x() * m_delta),
+       Round<cInt>(m_srcPoly[j].y() + m_normals[j].y() * m_delta)));
+   }
+diff --git a/deps_src/clipper/clipper.hpp b/deps_src/clipper/clipper.hpp
+index 06637eff..86fb70c4 100644
+--- a/deps_src/clipper/clipper.hpp
++++ b/deps_src/clipper/clipper.hpp
+@@ -72,6 +72,12 @@
+   namespace ClipperLib {
+ #endif
+ 
++// Karaza: see ClipperOffset::DoOffset. A path needs this many flat concave corners before
++// their spikes are left out. At 1024 all 28 test cases give the same grams as without this
++// change (256 moved Benchy on the S1 with organic supports by 0.18 g).
++static constexpr int    KZ_FLAT_SPIKES = 1024;
++static constexpr double KZ_FLAT_COS    = 0.99999;
++
+ enum ClipType { ctIntersection, ctUnion, ctDifference, ctXor };
+ enum PolyType { ptSubject, ptClip };
+ //By far the most widely used winding rules for polygon filling are
+@@ -560,6 +566,8 @@ private:
+   Path m_destPoly;
+   std::vector<DoublePoint, Allocator<DoublePoint>> m_normals;
+   double m_delta, m_sinA, m_sin, m_cos;
++  // Karaza: leave out the spike point at flat concave corners on this path (see DoOffset).
++  bool m_skipFlatSpikes = false;
+   double m_miterLim, m_StepsPerRad;
+   // x: index of the lowest contour in m_polyNodes
+   // y: index of the lowest point in the lowest contour
 diff --git a/src/libslic3r/Arachne/SkeletalTrapezoidation.cpp b/src/libslic3r/Arachne/SkeletalTrapezoidation.cpp
 index 2d2cf989..9fa1f677 100644
 --- a/src/libslic3r/Arachne/SkeletalTrapezoidation.cpp
@@ -168,29 +258,3 @@ index e25ef7db..c2c9e855 100644
  }
  
  std::tuple<float, float> Print::object_skirt_offset(double margin_height) const
-diff --git a/deps_src/admesh/stlinit.cpp b/deps_src/admesh/stlinit.cpp
---- a/deps_src/admesh/stlinit.cpp
-+++ b/deps_src/admesh/stlinit.cpp
-@@ -75,6 +75,22 @@
-       		break;
-     	}
-   	}
-+	// A binary file whose first facets hold only zero normals and round
-+	// coordinates (0, 2, 40...) has no byte above 127 there and was taken
-+	// for ASCII, then failed to parse. If the facet count after the header
-+	// accounts for the exact file size, it is binary: in an ASCII file those
-+	// four bytes are text, which reads as hundreds of millions of facets.
-+	if (stl->stats.type == ascii) {
-+		uint32_t n = 0;
-+		fseek(fp, custom_header_length, SEEK_SET);
-+		bool read = fread(&n, sizeof(n), 1, fp) == 1;
-+#if BOOST_ENDIAN_BIG_BYTE
-+		stl_internal_reverse_quads((char*)&n, 4);
-+#endif /* BOOST_ENDIAN_BIG_BYTE */
-+		if (read && n > 0 &&
-+		    int64_t(file_size) == int64_t(header_size) + int64_t(n) * SIZEOF_STL_FACET)
-+			stl->stats.type = binary;
-+	}
-   	rewind(fp);
- 
-   	uint32_t num_facets = 0;

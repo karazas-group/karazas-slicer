@@ -221,10 +221,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char *kz_slice(const char *stl_path, const
     // which Arachne's recursive SkeletalTrapezoidation::propagateBeadingsDownward overflows silently -> heap corruption.
     static tbb::global_control stack_ctl(tbb::global_control::thread_stack_size, 4u << 20);
     // TBB must not want more threads than the pthread pool has (PTHREAD_POOL_SIZE
-    // uses the same 2..4 clamp); a blocked caller can't grow the pool, so more
+    // uses the same 2..8 clamp); a blocked caller can't grow the pool, so more
     // would deadlock.
     static tbb::global_control threads_ctl(tbb::global_control::max_allowed_parallelism,
-                                           std::clamp(emscripten_num_logical_cores(), 2, 4));
+                                           std::clamp(emscripten_num_logical_cores(), 2, 8));
     Overrides kv;
     std::string o = overrides ? overrides : "";
     for (size_t pos = 0; pos < o.size();) {

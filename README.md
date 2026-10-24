@@ -57,7 +57,31 @@ From the first spike (full write-up in `REPORT.md`):
   also calls a file binary when the facet count in its header gives its
   exact size. Same grams as native (fed an ASCII copy) on all 4 cases, and
   the other 28 cases are unchanged to 0.001 g.
-- Tried and dropped: -O3 with -msimd128. Heavy jobs were 3-7% faster but
+- Clipper fix (Oct 24). Profiling Benchy with supports showed half the
+  time on one thread, inside two Clipper offsets in Orca's bridge-over-infill
+  code: 0.65 s for one shrink of a 20k point curve on layer 2. At each concave
+  corner Clipper adds a point back at the vertex, which makes a spike as long
+  as the offset. A curve sampled every 2 µm zigzags at the nanometre level, so
+  it gets thousands of them, and the union that cleans them up goes
+  quadratic. Native g++ is just as slow (0.48 s), so it's Orca's Clipper, not
+  wasm. The patch leaves that point out at almost flat corners (cos ≥
+  0.99999), the way Clipper2 does, but only on paths with 1024 or more of
+  them. Without that limit organic supports shifted by up to 0.18 g, since
+  they react to rounding-level changes. With it all 28 cases and the
+  pricer's 8 give the same grams as before. Pricer settings, Node, 4 cores:
+  Benchy 3.7 s to 2.3 s, Benchy with supports 5.0 s to 3.8 s, the 7-case
+  bench 14.1 s to 11.0 s, the matrix 35.2 s to 28.8 s.
+- Threads (Oct 24): up to 8 now (was 4), from `navigator.hardwareConcurrency`,
+  in both the TBB cap in the driver and `PTHREAD_POOL_SIZE`. This box has 4
+  cores, so the gain isn't measured: 2, 3 and 4 threads fit about 5.8 s of
+  serial work plus 19.6 s that splits across threads, which predicts about
+  23% less time on 8 cores. Grams are the same at every thread count. 8
+  workers start in about 25 ms more than 4 in Chromium, and the heap stays at
+  its initial 256 MB on every test model either way. Running 8 threads on
+  4 cores is about 20% slower than 4, but `hardwareConcurrency` reports the
+  real logical core count, so that only happens if a browser lies about it.
+  Still to check on a real phone.
+- Tried and dropped: -O3 on Clipper (no change). -O3 with -msimd128. Heavy jobs were 3-7% faster but
   small ones about 1 s slower (bigger module for each thread to load), the
   matrix went from 138 s to 146 s, and the download grew by 320 KB gzip.
 
@@ -80,9 +104,12 @@ open: preloading makes the first quote faster but costs 2 MB on limited data.
 
 - `patches/orca-2.4.2-wasm.patch`: the small source patches (STEP and
   JPEG cut out, two 32-bit `size_t` fixes, a missing include, the platform
-  check, `KZ_NO_GCODE` guards on G-code export in Print.cpp, and admesh's
-  binary STL detection). The admesh fix is in `deps.sh`'s objects
-  (`libdeps.a`), not libslic3r.
+  check, `KZ_NO_GCODE` guards on G-code export in Print.cpp, admesh's
+  binary STL detection, and the Clipper offset fix). The admesh fix is in
+  `deps.sh`'s objects (`libdeps.a`), not libslic3r. Clipper is compiled into
+  both: `deps.sh` builds `deps_src/clipper` into `libdeps.a`, and libslic3r's
+  `clipper.cpp` includes it again under the `Slic3r` namespace, so rebuild
+  both after changing it.
   Apply to a clone of OrcaSlicer at tag v2.4.2.
 - `wasm/driver/`: the entry point (`kz_slice()`: STL + flattened profiles +
   `key value` overrides in, grams out; `-DKZ_GCODE` also writes G-code) and
