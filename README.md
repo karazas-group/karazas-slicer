@@ -5,9 +5,19 @@ OrcaSlicer's slicing core (libslic3r, v2.4.2) compiled to WebAssembly, so the
 and the same profiles the shop prints with. It replaced Kiri:Moto in the pricer
 on 2026-10-20.
 
-This branch has no history in common with the website. It's here because the
-session that started it couldn't create a separate repo. Move it to its own
-repo whenever that's possible; nothing in it depends on the website.
+This repo started as the `karaza-slicer` branch of the website repo and moved
+here on 2026-10-24 with its history. Nothing in it depends on the website.
+
+The browser build is `kz-slicer.{js,wasm}` (factory `KzSlicer`). The website
+serves it from `assets/kz/slicer/`; `wasm/link_web.sh` writes it.
+
+## Licence
+
+OrcaSlicer is AGPL-3.0, so this repo is too: see `LICENSE`. The website hands
+`kz-slicer.wasm` to every visitor who uses the pricer, so they're entitled to
+this source, including our patch and driver. Keeping this repo public and
+linking to it from the site covers that. The licence can't be changed, since
+it comes from OrcaSlicer (and PrusaSlicer and Slic3r before it).
 
 ## Where it stands
 
