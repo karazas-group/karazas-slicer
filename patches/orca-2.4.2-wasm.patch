@@ -26,10 +26,103 @@ index a69bd549..c2d8696f 100644
  
    	uint32_t num_facets = 0;
 diff --git a/deps_src/clipper/clipper.cpp b/deps_src/clipper/clipper.cpp
-index 1f16446a..73b564d9 100644
+index 1f16446a..955e950d 100644
 --- a/deps_src/clipper/clipper.cpp
 +++ b/deps_src/clipper/clipper.cpp
-@@ -3609,6 +3609,21 @@ void ClipperOffset::DoOffset(double delta)
+@@ -1848,13 +1848,34 @@ void Clipper::SetHoleState(TEdge *e, OutRec *outrec)
+ }
+ //------------------------------------------------------------------------------
+ 
+-OutRec* GetLowermostRec(OutRec *outRec1, OutRec *outRec2)
++// Karaza: is a lower than b, in GetBottomPt's order (larger y, then smaller x)?
++inline bool KzLower(const IntPoint &a, const IntPoint &b)
++{
++  return a.y() > b.y() || (a.y() == b.y() && a.x() < b.x());
++}
++
++// Karaza: a point added to the ring during the sweep.
++inline void KzAddBot(OutRec *outRec, OutPt *op)
++{
++  if (KzLower(op->Pt, outRec->KzBot)) { outRec->KzBot = op->Pt; outRec->KzBotPt = op; outRec->KzBotCount = 1; }
++  else if (op->Pt == outRec->KzBot) ++ outRec->KzBotCount;
++}
++
++// Karaza: during the sweep (inSweep) a ring with a single point at its lowest coordinate has that
++// point as its GetBottomPt(), so it needn't be walked. Otherwise (several points there, or after
++// the sweep, when JoinCommonEdges and FixupOutPolygon move points) it is walked as before.
++inline OutPt* KzBottomPt(OutRec *outRec, bool inSweep)
++{
++  return inSweep && outRec->KzBotCount == 1 ? outRec->KzBotPt : GetBottomPt(outRec->Pts);
++}
++
++OutRec* GetLowermostRec(OutRec *outRec1, OutRec *outRec2, bool inSweep)
+ {
+   //work out which polygon fragment has the correct hole state ...
+   if (!outRec1->BottomPt) 
+-    outRec1->BottomPt = GetBottomPt(outRec1->Pts);
++    outRec1->BottomPt = KzBottomPt(outRec1, inSweep);
+   if (!outRec2->BottomPt) 
+-    outRec2->BottomPt = GetBottomPt(outRec2->Pts);
++    outRec2->BottomPt = KzBottomPt(outRec2, inSweep);
+   OutPt *OutPt1 = outRec1->BottomPt;
+   OutPt *OutPt2 = outRec2->BottomPt;
+   if (OutPt1->Pt.y() > OutPt2->Pt.y()) return outRec1;
+@@ -1900,7 +1921,7 @@ void Clipper::AppendPolygon(TEdge *e1, TEdge *e2)
+   else if (OutRec1RightOfOutRec2(outRec2, outRec1))
+     holeStateRec = outRec1;
+   else 
+-    holeStateRec = GetLowermostRec(outRec1, outRec2);
++    holeStateRec = GetLowermostRec(outRec1, outRec2, true);
+ 
+   //get the start and ends of both output polygons and
+   //join e2 poly onto e1 poly and delete pointers to e2 ...
+@@ -1952,6 +1973,11 @@ void Clipper::AppendPolygon(TEdge *e1, TEdge *e2)
+   }
+ 
+   outRec1->BottomPt = 0;
++  // Karaza: the merged ring's lowest point is the lower of the two (see OutRec::KzBot).
++  if (KzLower(outRec2->KzBot, outRec1->KzBot)) {
++    outRec1->KzBot = outRec2->KzBot; outRec1->KzBotPt = outRec2->KzBotPt; outRec1->KzBotCount = outRec2->KzBotCount;
++  } else if (outRec2->KzBot == outRec1->KzBot)
++    outRec1->KzBotCount += outRec2->KzBotCount;
+   if (holeStateRec == outRec2)
+   {
+     if (outRec2->FirstLeft != outRec1)
+@@ -1993,6 +2019,8 @@ OutRec* Clipper::CreateOutRec()
+   result.FirstLeft = 0;
+   result.Pts = 0;
+   result.BottomPt = 0;
++  result.KzBotPt = 0;
++  result.KzBotCount = 0;
+   result.PolyNd = 0;
+   result.Idx = (int)m_PolyOuts.size()-1;
+   return &result;
+@@ -2011,6 +2039,7 @@ OutPt* Clipper::AddOutPt(TEdge *e, const IntPoint &pt)
+     newOp->Pt = pt;
+     newOp->Next = newOp;
+     newOp->Prev = newOp;
++    outRec->KzBot = pt; outRec->KzBotPt = newOp; outRec->KzBotCount = 1;
+     if (!outRec->IsOpen)
+       SetHoleState(e, outRec);
+     e->OutIdx = outRec->Idx;
+@@ -2033,6 +2062,7 @@ OutPt* Clipper::AddOutPt(TEdge *e, const IntPoint &pt)
+     newOp->Prev->Next = newOp;
+     op->Prev = newOp;
+     if (ToFront) outRec->Pts = newOp;
++    KzAddBot(outRec, newOp);
+     return newOp;
+   }
+ }
+@@ -3265,7 +3295,7 @@ void Clipper::JoinCommonEdges()
+     if (outRec1 == outRec2) holeStateRec = outRec1;
+     else if (OutRec1RightOfOutRec2(outRec1, outRec2)) holeStateRec = outRec2;
+     else if (OutRec1RightOfOutRec2(outRec2, outRec1)) holeStateRec = outRec1;
+-    else holeStateRec = GetLowermostRec(outRec1, outRec2);
++    else holeStateRec = GetLowermostRec(outRec1, outRec2, false);
+ 
+     if (!JoinPoints(&join, outRec1, outRec2)) continue;
+ 
+@@ -3609,6 +3639,21 @@ void ClipperOffset::DoOffset(double delta)
      else
        m_normals.emplace_back(DoublePoint(m_normals[len - 2]));
  
@@ -51,7 +144,7 @@ index 1f16446a..73b564d9 100644
      if (node.m_endtype == etClosedPolygon)
      {
        int k = len - 1;
-@@ -3713,7 +3728,9 @@ void ClipperOffset::OffsetPoint(int j, int& k, JoinType jointype)
+@@ -3713,7 +3758,9 @@ void ClipperOffset::OffsetPoint(int j, int& k, JoinType jointype)
    {
      m_destPoly.emplace_back(IntPoint2d(Round<cInt>(m_srcPoly[j].x() + m_normals[k].x() * m_delta),
        Round<cInt>(m_srcPoly[j].y() + m_normals[k].y() * m_delta)));
@@ -63,7 +156,7 @@ index 1f16446a..73b564d9 100644
        Round<cInt>(m_srcPoly[j].y() + m_normals[j].y() * m_delta)));
    }
 diff --git a/deps_src/clipper/clipper.hpp b/deps_src/clipper/clipper.hpp
-index 06637eff..e2f630bf 100644
+index 06637eff..64c31e05 100644
 --- a/deps_src/clipper/clipper.hpp
 +++ b/deps_src/clipper/clipper.hpp
 @@ -72,6 +72,13 @@
@@ -80,7 +173,21 @@ index 06637eff..e2f630bf 100644
  enum ClipType { ctIntersection, ctUnion, ctDifference, ctXor };
  enum PolyType { ptSubject, ptClip };
  //By far the most widely used winding rules for polygon filling are
-@@ -560,6 +567,8 @@ private:
+@@ -301,6 +308,13 @@ enum EdgeSide { esLeft = 1, esRight = 2};
+       // Linked list of output points, dynamically allocated.
+       OutPt* Pts;
+       OutPt* BottomPt;
++      // Karaza: the lowest point so far (largest y, then smallest x), one OutPt there and how
++      // many OutPts sit on it, kept up to date while the sweep adds points. GetBottomPt walks the
++      // whole ring, and AppendPolygon clears BottomPt on every merge, so a ring built from many
++      // fragments was walked once per merge. Only valid during the sweep (see GetLowermostRec).
++      IntPoint KzBot;
++      OutPt*   KzBotPt;
++      int      KzBotCount;
+   };
+ 
+   struct Join {
+@@ -560,6 +574,8 @@ private:
    Path m_destPoly;
    std::vector<DoublePoint, Allocator<DoublePoint>> m_normals;
    double m_delta, m_sinA, m_sin, m_cos;
