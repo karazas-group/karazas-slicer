@@ -65,7 +65,7 @@ From the first spike (full write-up in `REPORT.md`):
   it gets thousands of them, and the union that cleans them up goes
   quadratic. Native g++ is just as slow (0.48 s), so it's Orca's Clipper, not
   wasm. The patch leaves that point out at almost flat corners (cos ≥
-  0.99999), the way Clipper2 does, but only on paths with 1024 or more of
+  0.9999 since Oct 25, 0.99999 before), the way Clipper2 does, but only on paths with 1024 or more of
   them. Without that limit organic supports shifted by up to 0.18 g, since
   they react to rounding-level changes. With it all 28 cases and the
   pricer's 8 give the same grams as before. Pricer settings, Node, 4 cores:
@@ -81,7 +81,32 @@ From the first spike (full write-up in `REPORT.md`):
   4 cores is about 20% slower than 4, but `hardwareConcurrency` reports the
   real logical core count, so that only happens if a browser lies about it.
   Still to check on a real phone.
-- Tried and dropped: -O3 on Clipper (no change). -O3 with -msimd128. Heavy jobs were 3-7% faster but
+- Second round (Oct 25), from a profile of Benchy, cup, invcone, sphere40
+  and mushroom on both printers. Benchy on the P2S ran 7.3 s of CPU in 3.1 s
+  wall on 4 cores; 42% of the wall had one thread or none busy. Four changes,
+  all with the same grams on the 28 cases, the 18 pricer cases (9 models,
+  supports on and off) and at 2, 3, 4 and 8 threads:
+  - Organic supports are generated while infill and ironing run, once
+    `prepare_infill()` is done (they read its bridge surfaces, so not
+    sooner). Other support styles read the infill and stay in order.
+  - The convex hull (qhull) is built on first use instead of on load. The
+    pricing build never needs it: the lowest point comes from the mesh
+    vertices, which gives the same number. Benchy's load went from about
+    0.5 s to 0.2 s, and bigger meshes save more.
+  - Two steps only the G-code writer uses are skipped (curled-extrusion
+    estimate, overhangs for z hop). The wasm is 360 KB smaller (6.15 MB).
+  - The Clipper flat-corner limit went from cos 0.99999 to 0.9999. One
+    10k-point offset on Benchy's second layer went from 203 ms to 6 ms.
+  Node, pricer settings, 4 cores, 3 runs each: Benchy 2.35 s to 1.86 s,
+  Benchy with supports 3.72 s to 2.97 s, the 7-case bench 11.4 s to 9.9 s,
+  the matrix 28.8 s to 24.4 s.
+- Found, not done yet: Voronoi in Arachne falls back to exact big-integer
+  maths on round parts (cup on the S1 spends 77% of its time in Arachne);
+  one slow infill layer often finishes last while the other threads wait
+  (ordering layers by cost should save 0.15-0.25 s on Benchy); the first
+  slice after load runs 0.2-1.1 s slower while the browser optimises the
+  module, which a warm-up slice in the background would hide.
+- Tried and dropped: -O3 on Clipper and on Voronoi (no change). -O3 with -msimd128. Heavy jobs were 3-7% faster but
   small ones about 1 s slower (bigger module for each thread to load), the
   matrix went from 138 s to 146 s, and the download grew by 320 KB gzip.
 
@@ -105,7 +130,8 @@ open: preloading makes the first quote faster but costs 2 MB on limited data.
 - `patches/orca-2.4.2-wasm.patch`: the small source patches (STEP and
   JPEG cut out, two 32-bit `size_t` fixes, a missing include, the platform
   check, `KZ_NO_GCODE` guards on G-code export in Print.cpp, admesh's
-  binary STL detection, and the Clipper offset fix). The admesh fix is in
+  binary STL detection, the Clipper offset fix, organic supports alongside
+  infill, the lazy convex hull and the skipped G-code-only steps). The admesh fix is in
   `deps.sh`'s objects (`libdeps.a`), not libslic3r. Clipper is compiled into
   both: `deps.sh` builds `deps_src/clipper` into `libdeps.a`, and libslic3r's
   `clipper.cpp` includes it again under the `Slic3r` namespace, so rebuild
