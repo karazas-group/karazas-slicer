@@ -101,11 +101,17 @@ From the first spike (full write-up in `REPORT.md`):
   Benchy with supports 3.72 s to 2.97 s, the 7-case bench 11.4 s to 9.9 s,
   the matrix 28.8 s to 24.4 s.
 - Found, not done yet: Voronoi in Arachne falls back to exact big-integer
-  maths on round parts (cup on the S1 spends 77% of its time in Arachne);
-  one slow infill layer often finishes last while the other threads wait
-  (ordering layers by cost should save 0.15-0.25 s on Benchy); the first
-  slice after load runs 0.2-1.1 s slower while the browser optimises the
-  module, which a warm-up slice in the background would hide.
+  maths on round parts (cup on the S1 spends 77% of its time in Arachne).
+  The website's pricer uses the classic wall generator, so it doesn't hit
+  this.
+- Done on the website instead (2026-10-25): the first slice after load ran
+  0.2-1.1 s slower while the browser optimised the module. The pricer's
+  worker now slices a small model as soon as the module loads; Benchy's
+  first quote is about 0.4 s faster.
+- Tried and dropped (2026-10-25): filling the infill layers most expensive
+  first (fill area weighted by density, a shared counter so the order holds
+  across threads). Same grams, no measurable change on the shop's profile:
+  10 cases, 3 runs, 12.0-12.8 s against 12.2-13.0 s.
 - Tried and dropped: -O3 on Clipper and on Voronoi (no change). -O3 with -msimd128. Heavy jobs were 3-7% faster but
   small ones about 1 s slower (bigger module for each thread to load), the
   matrix went from 138 s to 146 s, and the download grew by 320 KB gzip.
