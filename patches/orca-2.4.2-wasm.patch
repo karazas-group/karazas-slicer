@@ -63,23 +63,24 @@ index 1f16446a..73b564d9 100644
        Round<cInt>(m_srcPoly[j].y() + m_normals[j].y() * m_delta)));
    }
 diff --git a/deps_src/clipper/clipper.hpp b/deps_src/clipper/clipper.hpp
-index 06637eff..86fb70c4 100644
+index 06637eff..e2f630bf 100644
 --- a/deps_src/clipper/clipper.hpp
 +++ b/deps_src/clipper/clipper.hpp
-@@ -72,6 +72,12 @@
+@@ -72,6 +72,13 @@
    namespace ClipperLib {
  #endif
  
-+// Karaza: see ClipperOffset::DoOffset. A path needs this many flat concave corners before
-+// their spikes are left out. At 1024 all 28 test cases give the same grams as without this
-+// change (256 moved Benchy on the S1 with organic supports by 0.18 g).
++// Karaza: see ClipperOffset::DoOffset. A path needs this many flat concave corners (cos at or
++// above KZ_FLAT_COS, under about 0.8 degrees) before their spikes are left out. With these
++// values all 28 matrix cases and the 18 pricer cases give the same grams as without the change;
++// a limit of 256 moved Benchy on the S1 with organic supports by 0.18 g.
 +static constexpr int    KZ_FLAT_SPIKES = 1024;
-+static constexpr double KZ_FLAT_COS    = 0.99999;
++static constexpr double KZ_FLAT_COS    = 0.9999;
 +
  enum ClipType { ctIntersection, ctUnion, ctDifference, ctXor };
  enum PolyType { ptSubject, ptClip };
  //By far the most widely used winding rules for polygon filling are
-@@ -560,6 +566,8 @@ private:
+@@ -560,6 +567,8 @@ private:
    Path m_destPoly;
    std::vector<DoublePoint, Allocator<DoublePoint>> m_normals;
    double m_delta, m_sinA, m_sin, m_cos;
@@ -163,7 +164,7 @@ index d3210723..2c39a530 100644
  #include <fast_float/fast_float.h>
  
 diff --git a/src/libslic3r/Model.cpp b/src/libslic3r/Model.cpp
-index d1ca3cf8..552407df 100644
+index d1ca3cf8..89ad0ac7 100644
 --- a/src/libslic3r/Model.cpp
 +++ b/src/libslic3r/Model.cpp
 @@ -191,6 +191,9 @@ Model Model::read_from_step(const std::string&
@@ -184,8 +185,39 @@ index d1ca3cf8..552407df 100644
  }
  
  // BBS: add part plate related logic
+@@ -2322,11 +2326,16 @@ double ModelObject::get_instance_min_z(size_t instance_idx) const
+             continue;
+ 
+         const Transform3d mv = mi * v->get_matrix();
++        // Karaza: the extreme vertex of the hull is a vertex of the mesh, so scanning the mesh gives the same min_z
++        // without building the hull (qhull on a 225k triangle model takes ~280 ms).
++        if (! v->has_convex_hull()) {
++            const TriangleMesh& mesh = v->mesh();
++            for (const stl_triangle_vertex_indices& facet : mesh.its.indices)
++                for (int i = 0; i < 3; ++i)
++                    min_z = std::min(min_z, (mv * mesh.its.vertices[facet[i]].cast<double>()).z());
++            continue;
++        }
+         const TriangleMesh& hull = v->get_convex_hull();
+-        //BBS: in some case the convex hull is empty due to the qhull algo
+-        //use the original mesh instead
+-        //TODO: when the vertex's x/y/z are all the same, the run_qhull can not get correct result
+-        //we need to find another algo then
+         if (hull.its.indices.size() == 0) {
+             const TriangleMesh& mesh = v->mesh();
+             for (const stl_triangle_vertex_indices& facet : mesh.its.indices)
+@@ -2710,6 +2719,9 @@ int ModelVolume::get_repaired_errors_count() const
+ 
+ const TriangleMesh& ModelVolume::get_convex_hull() const
+ {
++    // Karaza: built on first use (see ModelVolume constructors).
++    if (! m_convex_hull)
++        const_cast<ModelVolume*>(this)->calculate_convex_hull();
+     return *m_convex_hull.get();
+ }
+ 
 diff --git a/src/libslic3r/Model.hpp b/src/libslic3r/Model.hpp
-index d8697adb..6e56f1cb 100644
+index d8697adb..9c4360ba 100644
 --- a/src/libslic3r/Model.hpp
 +++ b/src/libslic3r/Model.hpp
 @@ -23,7 +23,13 @@
@@ -202,6 +234,36 @@ index d8697adb..6e56f1cb 100644
  //BBS: add stl
  #include "Format/STL.hpp"
  #include "Format/OBJ.hpp"
+@@ -950,7 +956,8 @@ public:
+ 
+     void                calculate_convex_hull();
+     const TriangleMesh& get_convex_hull() const;
+-    const std::shared_ptr<const TriangleMesh>& get_convex_hull_shared_ptr() const { return m_convex_hull; }
++    bool has_convex_hull() const { return m_convex_hull.get() != nullptr; }
++    const std::shared_ptr<const TriangleMesh>& get_convex_hull_shared_ptr() const { if (! m_convex_hull) const_cast<ModelVolume*>(this)->calculate_convex_hull(); return m_convex_hull; }
+     //BBS: add convex_hell_2d related logic
+     const Polygon& get_convex_hull_2d(const Transform3d &trafo_instance) const;
+     void invalidate_convex_hull_2d()
+@@ -1071,8 +1078,7 @@ private:
+         assert(this->id() != this->seam_facets.id());
+         assert(this->id() != this->mmu_segmentation_facets.id());
+         assert(this->id() != this->fuzzy_skin_facets.id());
+-        if (mesh.facets_count() > 1)
+-            calculate_convex_hull();
++        // Karaza: the convex hull is built on first use, see get_convex_hull()
+     }
+     ModelVolume(ModelObject *object, const std::shared_ptr<const TriangleMesh> &mesh, ModelVolumeType type = ModelVolumeType::MODEL_PART) : m_mesh(mesh), m_type(type), object(object)
+     {
+@@ -1149,8 +1155,7 @@ private:
+         assert(this->config.id() == other.config.id());
+         this->set_material_id(other.material_id());
+         this->config.set_new_unique_id();
+-        if (m_mesh->facets_count() > 1)
+-            calculate_convex_hull();
++        // Karaza: the convex hull is built on first use, see get_convex_hull()
+ 		assert(this->config.id().valid()); 
+         assert(this->config.id() != other.config.id()); 
+         assert(this->supported_facets.id() != other.supported_facets.id());
 diff --git a/src/libslic3r/Platform.cpp b/src/libslic3r/Platform.cpp
 index 33875211..4d63a485 100644
 --- a/src/libslic3r/Platform.cpp
@@ -217,10 +279,74 @@ index 33875211..4d63a485 100644
      BOOST_LOG_TRIVIAL(info) << "Platform: OpenBSD";
  	s_platform 		  = Platform::BSDUnix;
 diff --git a/src/libslic3r/Print.cpp b/src/libslic3r/Print.cpp
-index e25ef7db..c2c9e855 100644
+index e25ef7db..beeef7ad 100644
 --- a/src/libslic3r/Print.cpp
 +++ b/src/libslic3r/Print.cpp
-@@ -2617,6 +2617,11 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
+@@ -33,6 +33,7 @@
+ 
+ #include <tbb/blocked_range.h>
+ #include <tbb/parallel_for.h>
++#include <tbb/task_group.h>
+ 
+ //BBS: add json support
+ #include "nlohmann/json.hpp"
+@@ -2299,7 +2300,12 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
+             }
+         }
+         for (PrintObject *obj : m_objects) {
++#ifdef KZ_NO_GCODE
++            // Karaza: the curled-line estimate only feeds the overhang speeds of the G-code writer.
++            if (false) {
++#else
+             if (need_slicing_objects.count(obj) != 0) {
++#endif
+                 obj->estimate_curled_extrusions();
+             }
+             else {
+@@ -2307,6 +2313,20 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
+                     obj->set_done(posEstimateCurledExtrusions);
+             }
+         }
++        // Karaza: organic tree supports read the layer outlines, the perimeters, and the bridge
++        // surfaces prepare_infill() leaves in fill_surfaces (remove_bridges_from_contacts). None of
++        // that changes after prepare_infill(), and make_fills() and ironing don't read what the
++        // supports write, so the supports can be generated while those run. Z contouring edits the
++        // perimeters, so not with it.
++        tbb::task_group kz_support_group;
++        struct KzWait { tbb::task_group &g; bool waited = false; ~KzWait() { if (!waited) { try { g.wait(); } catch (...) {} } } } kz_wait{kz_support_group};
++        for (PrintObject *obj : m_objects)
++            if (need_slicing_objects.count(obj) != 0 && obj->has_support() && !obj->has_raft() && obj->layer_count() > 1 &&
++                is_tree(obj->config().support_type.value) && obj->config().support_style.value == smsTreeOrganic &&
++                obj->get_shared_object() == nullptr && !obj->need_z_contouring()) {
++                obj->prepare_infill();
++                kz_support_group.run([obj] { obj->generate_support_material(); });
++            }
+         for (PrintObject *obj : m_objects) {
+             if (need_slicing_objects.count(obj) != 0) {
+                 obj->infill();
+@@ -2339,6 +2359,8 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
+             }
+         }
+ 
++        kz_wait.waited = true;
++        kz_support_group.wait();
+         tbb::parallel_for(tbb::blocked_range<int>(0, int(m_objects.size())),
+             [this, need_slicing_objects](const tbb::blocked_range<int>& range) {
+                 for (int i = range.begin(); i < range.end(); i++) {
+@@ -2355,7 +2377,12 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
+         );
+ 
+         for (PrintObject* obj : m_objects) {
++#ifdef KZ_NO_GCODE
++            // Karaza: overhangs for auto-lift (z hop) only matter to the G-code writer.
++            if (false) {
++#else
+             if (need_slicing_objects.count(obj) != 0) {
++#endif
+                 obj->detect_overhangs_for_lift();
+             }
+             else {
+@@ -2617,6 +2644,11 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
  // It is up to the caller to show an error message.
  std::string Print::export_gcode(const std::string& path_template, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
  {
@@ -232,7 +358,7 @@ index e25ef7db..c2c9e855 100644
      // output everything to a G-code file
      // The following call may die if the filename_format template substitution fails.
      std::string path = this->output_filepath(path_template);
-@@ -2641,6 +2646,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
+@@ -2641,6 +2673,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
      if (result != nullptr)
          result->conflict_result = m_conflict_result;
      return path.c_str();
@@ -240,7 +366,7 @@ index e25ef7db..c2c9e855 100644
  }
  
  void Print::_make_skirt()
-@@ -3756,6 +3762,9 @@ void Print::set_gcode_file_invalidated()
+@@ -3756,6 +3789,9 @@ void Print::set_gcode_file_invalidated()
  //BBS: add gcode file preload logic
  void Print::export_gcode_from_previous_file(const std::string& file, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
  {
@@ -250,7 +376,7 @@ index e25ef7db..c2c9e855 100644
      try {
          GCodeProcessor processor;
          GCodeProcessor::s_IsBBLPrinter = is_BBL_printer();
-@@ -3772,6 +3781,7 @@ void Print::export_gcode_from_previous_file(const std::string& file, GCodeProces
+@@ -3772,6 +3808,7 @@ void Print::export_gcode_from_previous_file(const std::string& file, GCodeProces
      }
  
      BOOST_LOG_TRIVIAL(info) << __FUNCTION__ <<  boost::format(":  process the G-code file %1% successfully")%file.c_str();
