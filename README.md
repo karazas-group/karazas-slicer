@@ -104,10 +104,10 @@ From the first spike (full write-up in `REPORT.md`):
   maths on round parts (cup on the S1 spends 77% of its time in Arachne).
   The website's pricer uses the classic wall generator, so it doesn't hit
   this.
-- Done on the website instead (2026-10-25): the first slice after load ran
-  0.2-1.1 s slower while the browser optimised the module. The pricer's
-  worker now slices a small model as soon as the module loads; Benchy's
-  first quote is about 0.4 s faster.
+- Tried on the website and removed (2026-10-25): the first slice after load
+  runs 0.2-1.1 s slower while the browser optimises the module. A warm-up
+  slice as soon as the module loaded made Benchy's first quote about 0.4 s
+  faster, but it made the page lag while the model was loading.
 - Tried and dropped (2026-10-25): filling the infill layers most expensive
   first (fill area weighted by density, a shared counter so the order holds
   across threads). Same grams, no measurable change on the shop's profile:
