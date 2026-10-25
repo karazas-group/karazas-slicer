@@ -100,6 +100,21 @@ From the first spike (full write-up in `REPORT.md`):
   Node, pricer settings, 4 cores, 3 runs each: Benchy 2.35 s to 1.86 s,
   Benchy with supports 3.72 s to 2.97 s, the 7-case bench 11.4 s to 9.9 s,
   the matrix 28.8 s to 24.4 s.
+- Third round (Oct 25), from a one-thread profile on the shop's P2S profile
+  at 2 walls / 15%. Clipper was 73% of Benchy's time. 12% was one function,
+  GetLowermostRec: each time two output fragments merge it walks the whole
+  merged ring to find its lowest point, so a ring built from many fragments
+  (offsets of finely sampled curves) is walked once per merge. The patch
+  keeps each ring's lowest point up to date while the sweep adds points and
+  only walks the ring when several points tie for lowest, or after the
+  sweep. Same output on 4000 random Clipper jobs (union, intersection,
+  difference, xor, every fill rule, trees, offsets, open paths) built
+  natively old against new, and the same grams on the 28 cases and the 18
+  pricer cases at 2/15 and 3/40. One thread: Benchy 5.3 s to 4.4 s, Benchy
+  with supports 9.8 s to 9.1 s. Four threads: the matrix 26.6 s to 24.2 s,
+  the 18 pricer cases at 2/15 15.3 s to 13.4 s. What's left in Clipper is
+  spread over the sweep itself (building the intersection list, the
+  active edge list), with no single step to cut.
 - Found, not done yet: Voronoi in Arachne falls back to exact big-integer
   maths on round parts (cup on the S1 spends 77% of its time in Arachne).
   The website's pricer uses the classic wall generator, so it doesn't hit
