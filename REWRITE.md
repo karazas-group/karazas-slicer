@@ -15,32 +15,40 @@ section 7 lists what has not been verified.
 
 ## 1. The gate
 
-Every step ends with all 28 cases of the matrix identical to the grams in
-`eval/golden-grams.txt` (7 models x P2S/S1 x supports off / organic at 35 deg).
-Nothing is committed to `rewrite` otherwise.
+Every step ends with all 54 cases identical to `eval/golden-mm.txt` at full
+precision: the filament length in mm as `%.17g`, so the plastic has to be
+bit-identical, not just equal to the hundredth of a gram. Nothing is
+committed to `rewrite` otherwise.
 
 ```
 bash wasm/roots.sh                      # compile kz/sources.txt into $OUT/roots
 bash wasm/link_web.sh                   # ~35 s, DEST=<name> for a new output dir
-node eval/gate.cjs $OUT/out/<name>/kz-slicer.js     # 28 cases, exit 0 only if identical
+node eval/gate.cjs $OUT/out/<name>/kz-slicer.js     # 54 cases, exit 0 only if identical
 ```
 
-`gate.cjs` needs `benchy.stl` (not in the repo, 11 MB): `BENCHY=/path/benchy.stl`
-or put it in `eval/models/`. Grams are printed rounded to 0.01 g, which is a
-weak test: a change of 1e-4 g passes it. Stage 1 therefore also compared the
-whole JSON (`filament_mm` to 0.1 mm as well) on the 28 cases between the old
-and new build, byte for byte. Each later stage should add a stricter check of
-its own output, cheaper than the whole pipeline: dump the stage's output
-(polygons, paths, volumes as exact integers or `%a` doubles) from the old and
-the new build and compare those files. That also finds a difference that
-rounding hides in grams today and a different input shows tomorrow. The
-golden list was taken from the build before stage 1; it equals the previous
-`matrix-final.txt`.
+The cases are what the pricer really sends: every model in `eval/models`
+plus Benchy (`BENCHY=/path/benchy.stl` or put it in `eval/models/`; it is not
+in the repo, 11 MB), with `eval/profiles/karaza.json` (a copy of the
+website's `assets/kz/slicer/karaza.json`, the only settings file the pricer
+loads) and the pricer's overrides: walls/infill 3/40, 2/15 and 4/80, supports
+off and on (organic, 35 deg, 8 interface layers). The golden file was written
+on 2026-10-26 by the build at the start of this change (stage 1 plus the
+full-precision output) and checked against the website's shipped wasm: all
+54 equal at the 0.1 mm the old output printed. A second run gives the same
+bits, so threading doesn't make it flaky. `--write` records a new golden
+file; only do that when the website's settings or overrides change, from a
+build that matches main.
 
-The matrix covers the P2S profile (classic walls) and the S1 profile, whose
-`wall_generator` is unset, so it takes Orca's default, Arachne. So Arachne is
-in the gate. It can only go once the owner says the pricer never prices with
-it (section 5).
+Each later stage should still add a cheaper check of its own output: dump
+the stage's result (polygons, paths, volumes as exact integers or `%a`
+doubles) from the old and the new build and compare the files. Removing a
+union in the organic supports changed nothing at 0.01 g but changed the
+plastic on 6 of 28 cases at full precision; that is the kind of thing the
+per-stage dump catches early.
+
+The old 28-case matrix over the P2S and S1 printer profiles is retired
+(2026-10-26, owner's decision): the slicer no longer knows about printers,
+and S1 was the only thing keeping Arachne in.
 
 ## 2. What runs today
 
@@ -206,58 +214,57 @@ support generator reads `fills`. Do it last.
 
 ## 5. Config branches the pricer never takes
 
-What the pricer sends: the P2S or S1 flattened machine/process/filament
-profile, plus overrides such as `wall_loops`, `sparse_infill_density`,
-`enable_support`, `support_type=tree(auto)`, `support_style=organic`,
-`support_threshold_angle` and a huge `printable_area`. Everything below is
-true only for that set. Dropping a branch means a request that sets it gets
-an error or the default, so each needs the owner's agreement and a
-fail-loud check in `apply.cpp` (reject a profile whose value is not supported
-rather than price it wrong).
+What the pricer sends: `karaza.json` (46 settings that change the plastic,
+nothing about the printer) plus overrides for `wall_loops`,
+`sparse_infill_density`, `enable_support`, and, with supports, organic tree
+supports at 35 deg with 8 interface layers, and a huge `printable_area`.
+That is a closed set. Anything outside it can go; `apply.cpp` should reject
+a value it doesn't support rather than price it wrong.
 
-Safe to delete on the basis of the code alone (G-code only; nothing in the
-slicer reads them):
+Decided by the owner (2026-10-26):
+- No printer profiles. One settings file, and the slicer doesn't know what
+  printer it is. The P2S and S1 profiles leave the gate.
+- Classic walls only. Arachne (`Arachne/`, `perimeters_arachne`, the Voronoi
+  code) goes. Classic is also 2-3x faster on round parts (cup 0.4 vs 1.2 s).
+- Brim: every part gets one. Today that is `brim_type=outer_only`, 5 mm, in
+  `karaza.json`. In the rewrite it is code, not a setting: `skirt_brim.cpp`
+  always draws a 5 mm outer brim around each part and has no skirt at all
+  (`skirt_loops` is 0). The brim and skirt settings and `Brim.cpp`'s other
+  modes (ears, inner, painted, per-support brims) go.
+- No G-code and nothing that only serves the printer: speeds, accelerations,
+  temperatures, fans, cooling, retraction, z-hop, wipe, seams, machine limits,
+  time estimates. One material, no colours (see section 10).
+
+Follows from the closed set (no further decision needed):
+- Organic tree supports only. `TreeSupport.cpp` (3786 lines, slim/strong/
+  hybrid), `SupportMaterial.cpp` (3309, normal/snug) and the parts of
+  `SupportCommon.cpp` only they use go.
+- Infill patterns: only the ones `karaza.json` names (gyroid sparse,
+  monotonic-line top and bottom) and the solid infill Orca uses
+  internally. The rest of `Fill/` (adaptive cubic, lightning, Hilbert,
+  Archimedean, TPMS, 3D honeycomb, ...) goes.
 - G-code writer, `GCodeProcessor`, cooling buffer, pressure advance, arc
-  fitting is NOT in this list: `PrintObject::simplify_extrusion_path`
-  (Print.cpp:2598, the three "Optimizing toolpath" laps, 5% of Benchy) runs
-  before the sum and rewrites wall, infill and support paths at `resolution`
-  0.012 mm, so it changes path lengths and therefore grams. It is a stage to
-  port (`simplify.cpp`), not to delete. `enable_arc_fitting` is 0 in both
-  profiles, so its branch can go if the owner confirms; seam placement is
-  G-code export only and is already out), `estimate_curled_extrusions` and
-  `detect_overhangs_for_lift` (already skipped).
+  fitting (`enable_arc_fitting` is 0), seam placement (already out),
+  `estimate_curled_extrusions` and `detect_overhangs_for_lift` (already
+  skipped).
 - Wipe tower and multi-material: `Print::_make_wipe_tower`, `ToolOrdering`,
-  `apply_mm_segmentation`, multi-extruder region splitting. The pricer prints
-  one material. Note the matrix goes through `ToolOrdering` today because
-  `Print::process` and the skirt step use it for `tools_for_layer`; replacing
-  that is part of `process.cpp`.
+  `apply_mm_segmentation`, multi-extruder region splitting. Note the pipeline
+  goes through `ToolOrdering` today because `Print::process` and the skirt
+  step use it for `tools_for_layer`; replacing that is part of `process.cpp`.
 - 3MF/OBJ/AMF/STEP readers, the preset system, the placeholder parser
   (already stubbed).
-- Sequential printing (`print_sequence=by object`), raft, spiral vase,
-  `contour_z`, conical overhang, fuzzy skin, `slicing_mode` other than
-  regular, adaptive layer heights, variable layer height profiles, shared
-  objects (`is_print_object_the_same`), multiple objects and instances (the
-  pricer prices one model; the sum multiplies by `instances().size()`).
+- Sequential printing, raft, spiral vase, `contour_z`, conical overhang, fuzzy
+  skin, `slicing_mode` other than regular, adaptive and variable layer
+  heights, shared objects, multiple objects and instances.
+- `ironing_type` other than none, `only_one_wall_*` modes it doesn't set,
+  `infill_combination`, `thick_bridges`, `gap_infill` off.
 
-Needs the owner to say the pricer never uses it:
-- Arachne (`wall_generator=arachne`). The S1 profile uses it by default and
-  the matrix has 14 cases on it. It is also the code with the 77%-of-time
-  case in the README and the Voronoi big-integer fallback. Keep it as
-  `perimeters_arachne.cpp` unless the owner decides all pricing uses classic.
-- Non-organic supports (normal/snug, tree(auto) with `tree_slim`/`tree_strong`/
-  `tree_hybrid`). `TreeSupport.cpp` (3786 lines), `SupportMaterial.cpp` (3309)
-  and most of `SupportCommon.cpp` serve those. The organic path calls only
-  parts of `SupportCommon.cpp` and `TreeSupport3D.cpp`.
-- Infill patterns the pricer UI does not offer (`Fill*.cpp`: adaptive cubic,
-  lightning, Hilbert, Archimedean, TPMS, 3D honeycomb, ...). Needs the list of
-  patterns the website can send. If it is a closed set, the rest of Fill/ goes.
-- `ironing_type` other than none, `only_one_wall_*`, `infill_combination`,
-  `thick_bridges`, top/bottom pattern variants, `gap_infill` off.
-
-Not deletable without changing grams: anything that edits geometry before
-the sum (elephant foot, xy compensation, bridges, gap fill, extra perimeters,
-`infill_wall_overlap`, flow ratios). Those stay until their stage is
-rewritten and proven equal.
+NOT deletable, because it changes the plastic: anything that edits geometry
+or paths before the sum (elephant foot, xy compensation, bridges, gap fill,
+extra perimeters, `infill_wall_overlap`, flow ratios) and
+`PrintObject::simplify_extrusion_path` (Print.cpp:2598, the "Optimizing
+toolpath" laps, 5% of Benchy), which shortens paths at `resolution` 0.012 mm
+before the sum. Those are stages to port (`simplify.cpp`), not delete.
 
 ## 6. Stage 1 (done): the split, the build, the gate
 
@@ -464,3 +471,35 @@ Things that will bite:
   matrix always was.
 - Native Orca differs from the wasm by up to 0.09 g on the matrix (README);
   the gate measures against the wasm, not native.
+
+## 10. Parked ideas
+
+Measured but not shipped, to pick up when the stage they live in is rewritten:
+- Edge map counting sort (`TriangleMesh.cpp`, `its_face_edge_ids` /
+  `create_edge_map`): two stable counting-sort passes instead of `std::sort`,
+  with the old sort as fallback when an edge key shows up 3+ times. Saves
+  ~230 ms of thread time on the inverted cone (sort 393 -> 240-266 ms); exact
+  on every check, including 19,500 calls compared in-run. Wall time on a
+  shared 4-core box: inside the noise. The fallback was never exercised.
+  Belongs to `mesh_slice.cpp` and the per-branch slicing in the supports.
+- Organic supports, avoidance precalculation (`TreeModelVolumes::precalculate`):
+  only 74-88% of the precomputed radius/layer keys are ever asked for. The
+  step costs 40-90 ms; computing on demand saves up to ~15% of it, but the
+  computation order changes, so it needs the full-precision gate.
+- Organic supports, smoothing setup cache (`organic_smooth_branches_avoid_collisions`):
+  about 6 ms of per-layer setup.
+- Organic supports, the per-tree union in `organic_draw_branches`: 0.52 s
+  wall on the inverted cone (3.4 s thread time). Removing it changes the
+  plastic by up to 0.00005 g on 6 of 28 cases. Rejected under the exact rule;
+  owner asked why, decision pending.
+- Same, the second union before `smooth_outward`: ~0.1 s thread time,
+  changes up to 0.00006 g on 4 cases. Same status.
+
+## 11. Later: multicolour
+
+Not now. Once the generators export colours in their 3MF files (open in
+Linear), the pricer could send a 3MF to the slicer and price each colour. In
+the module layout that is a separate reader stage (`load_3mf.cpp`) and a
+colour/tool split stage in front of `slice`, used only when a 3MF with
+colours comes in; STL pricing doesn't load it. Until then everything above
+assumes one material.

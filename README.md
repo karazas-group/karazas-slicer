@@ -184,8 +184,10 @@ open: preloading makes the first quote faster but costs 2 MB on limited data.
 - `wasm/cc.sh`, `wasm/deps.sh`, `wasm/link*.sh`: the spike's build scripts.
   `wasm/libslic3r-sources.txt` lists the 208 libslic3r files `cc.sh` was run on.
 - `wasm/reach.py`: works out which object files a link actually needs.
-- `eval/`: `gate.cjs` runs the 28 cases through a built module and compares
-  the grams with `golden-grams.txt`. The native reference: `wasm-batch.sh` runs the same 28 cases
+- `eval/`: `gate.cjs` runs the pricer's 54 cases (`karaza.json`, the
+  pricer's overrides) through a built module and compares the filament
+  length bit for bit with `golden-mm.txt` (REWRITE.md section 1). The old
+  P2S/S1 matrix and the native reference: `wasm-batch.sh` runs those 28 cases
   through the wasm build. `run.py` slices one model with the Orca CLI
   and prints grams, `batch.sh` runs the whole matrix, `flatten.py` turns an
   Orca system preset into one flat JSON. `profiles/` has the flattened P2S and
