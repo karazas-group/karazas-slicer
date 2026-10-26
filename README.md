@@ -48,7 +48,7 @@ From the first spike (full write-up in `REPORT.md`):
   G-code totals, and slices are 27-70% faster (Benchy 6.2 s to 4.0 s in
   Node). File readers, presets, the G-code writer and parser, the prime
   tower and the template parser are replaced by stand-ins in
-  `wasm/driver/` so the linker leaves them out.
+  `kz/stubs/` so the linker leaves them out.
 - `hollowbox40.stl` loads now (Oct 21). admesh decides binary vs ASCII by
   looking for a byte above 127 in the first 128 bytes after the header; a
   binary STL with zero normals and round coordinates has none, so it was
@@ -174,14 +174,18 @@ open: preloading makes the first quote faster but costs 2 MB on limited data.
   `clipper.cpp` includes it again under the `Slic3r` namespace, so rebuild
   both after changing it.
   Apply to a clone of OrcaSlicer at tag v2.4.2.
-- `wasm/driver/`: the entry point (`kz_slice()`: STL + flattened profiles +
-  `key value` overrides in, grams out; `-DKZ_GCODE` also writes G-code) and
-  the link-time stand-ins. `wasm/roots.sh` compiles them, `wasm/link_web.sh`
-  links the pricer's build, `wasm/link_check.sh` the validation build.
+- `kz/`: the pricer's own code, one file per stage (see `REWRITE.md`):
+  `entry.cpp` (`kz_slice()`: STL + flattened profiles + `key value`
+  overrides in, grams out), `pipeline.cpp`, `volume_sum.cpp`, and
+  `kz/stubs/` (the link-time stand-ins). `kz/sources.txt` lists what is
+  compiled; `wasm/roots.sh` compiles it, `wasm/link_web.sh` links the
+  pricer's build, `wasm/link_check.sh` the validation build (`-DKZ_GCODE` also
+  writes G-code).
 - `wasm/cc.sh`, `wasm/deps.sh`, `wasm/link*.sh`: the spike's build scripts.
   `wasm/libslic3r-sources.txt` lists the 208 libslic3r files `cc.sh` was run on.
 - `wasm/reach.py`: works out which object files a link actually needs.
-- `eval/`: the native reference. `wasm-batch.sh` runs the same 28 cases
+- `eval/`: `gate.cjs` runs the 28 cases through a built module and compares
+  the grams with `golden-grams.txt`. The native reference: `wasm-batch.sh` runs the same 28 cases
   through the wasm build. `run.py` slices one model with the Orca CLI
   and prints grams, `batch.sh` runs the whole matrix, `flatten.py` turns an
   Orca system preset into one flat JSON. `profiles/` has the flattened P2S and

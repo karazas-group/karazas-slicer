@@ -1,0 +1,26 @@
+# Every object the pricing build links ahead of libslic3r_all.a, one per line:
+#   name  link  source  [compiler flags]
+# name   roots/<name>.o
+# link   web = pricing build (link_web.sh), check = validation build
+#        (link_check.sh, G-code export linked back in), both = either
+# source kz/... is in this repo; orca:X is src/libslic3r/X of the patched
+#        Orca tree, compiled here only so a -D flag can change it
+# Order matters only for humans: the linker takes a symbol from the first
+# object that defines it and pulls an archive member only for symbols still
+# undefined, so an object here replaces the Orca object that defines the same
+# symbols. If it replaces only some of them the link fails with a duplicate
+# symbol, which is the check that a replacement is complete.
+#
+# stages (kz/*.cpp): the pricer's own code, one file per stage
+entry           both   kz/entry.cpp
+pipeline        web    kz/pipeline.cpp
+pipeline_check  check  kz/pipeline.cpp  -DKZ_GCODE
+volume_sum      both   kz/volume_sum.cpp
+# Orca files that still run, compiled with a switch
+print           web    orca:Print.cpp   -DKZ_NO_GCODE
+# stand-ins (kz/stubs/*.cpp): leave unused Orca code out of the link
+link_shims      both   kz/stubs/link_shims.cpp
+file_readers    both   kz/stubs/file_readers.cpp
+gcode_layers    web    kz/stubs/gcode_layers.cpp
+wipe_tower      web    kz/stubs/wipe_tower.cpp
+placeholder_parser web kz/stubs/placeholder_parser.cpp
