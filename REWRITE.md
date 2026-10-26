@@ -528,7 +528,7 @@ Measured but not shipped, to pick up when the stage they live in is rewritten:
     KZ_NO_GCODE.
   - PR 15969 (Clipper1 -> tuned Clipper2, about 35% faster on their bench,
     Benchy 56-73%): not exact. Extrusion moves up to 0.05% without supports
-    and organic supports by -0.6% to -2.9%, so tens of grams of difference
+    and organic supports by -0.6% to -2.9%, so 0.01-0.1 g on a typical part
     against a 0.001 g limit. Most of the gain is three ideas we could take
     on their own and gate one by one: a node allocator for Clipper's
     internals, the cheaper offset join, and one PolyTree pass per boolean.
