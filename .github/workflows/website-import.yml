@@ -1,0 +1,57 @@
+name: website import
+# When dist/ changes on main (wasm/publish.sh), puts the build on the
+# website's dev branch right away: clones blussyya/Karazas-website at dev and
+# runs its build/slicer-import.sh, which minifies, slice-checks, and commits.
+# Cloudflare Pages then deploys dev.karazas.pages.dev.
+# Needs a WEBSITE_TOKEN secret: a fine-grained token with Contents
+# read/write on blussyya/Karazas-website. Without it this only says so; the
+# website still imports the build on its next dev push (its own
+# slicer-import workflow).
+on:
+  push:
+    branches: [main]
+    paths: ['dist/**']
+  workflow_dispatch:
+concurrency:
+  group: website-import
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Token check
+        id: token
+        env:
+          T: ${{ secrets.WEBSITE_TOKEN }}
+        run: |
+          if [ -z "$T" ]; then
+            echo "::notice::No WEBSITE_TOKEN secret, so the website picks this build up on its next dev push."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.token.outputs.ok == 'true'
+        uses: actions/checkout@v4
+        with:
+          path: slicer
+      - if: steps.token.outputs.ok == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: blussyya/Karazas-website
+          ref: dev
+          path: website
+          token: ${{ secrets.WEBSITE_TOKEN }}
+      - if: steps.token.outputs.ok == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - if: steps.token.outputs.ok == 'true'
+        name: Import and push
+        working-directory: website
+        run: |
+          (cd build && npm ci)
+          git config user.name "karazas-slicer-import"
+          git config user.email "release@karazas.com"
+          before=$(git rev-parse HEAD)
+          bash build/slicer-import.sh ../slicer
+          [ "$(git rev-parse HEAD)" = "$before" ] || git push origin HEAD:dev
