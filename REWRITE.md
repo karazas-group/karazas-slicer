@@ -532,8 +532,23 @@ Measured but not shipped, to pick up when the stage they live in is rewritten:
     against a 0.001 g limit. Most of the gain is three ideas we could take
     on their own and gate one by one: a node allocator for Clipper's
     internals, the cheaper offset join, and one PolyTree pass per boolean.
-  - PRs 16065/16066/16440 (reslice memory leaks with tree supports): not
-    needed, the pricer throws the worker away after each slice.
+  - PRs 16066/16137 (leaks: tree support layers and caches, a static eps,
+    cloned gap fill): ported to the 2.4.2 patch anyway, 54/54 identical.
+    Reslice RSS levels off after ~3 slices with or without them.
+  - The three Clipper2 ideas tried alone on our Clipper1 (2026-10-26,
+    eval/ab.cjs, A/B alternated per case):
+    - node allocation: nothing to do, scalable_malloc already maps to
+      mimalloc in the wasm build.
+    - concave offset corners at the edge crossing: 54/54 identical, no
+      measurable gain (our flat-spike skip already covers dense curves).
+      Not kept.
+    - one PolyTree pass per boolean instead of Paths + union: within
+      4e-5 g, 2-3% faster. Too small to matter next to the full port.
+  - The full Clipper2 port (experiments/clipper2/, patch against 2.4.2 +
+    our patch, done by an agent): 1.27x faster over the gate (cup 2x,
+    Benchy 1.3x, organic supports ~1.2x), largest change 0.034 g (invcone
+    with supports), median 0.0002 g, 20/54 cases over 0.001 g. Waiting on
+    the owner's call to adopt it.
 
 ## 11. Later: multicolour
 
