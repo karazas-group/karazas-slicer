@@ -33,8 +33,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char *kz_slice(const char *stl_path, const
     }
     double t = 0, mm = 0, g = 0;
     int rc = kz::slice_one(stl_path, profiles, kv, gcode_out, &t, &mm, &g);
+    // filament_mm at full precision: the rewrite's gate compares it exactly.
     static char out[160];
-    std::snprintf(out, sizeof out, "{\"rc\":%d,\"time_s\":%.1f,\"filament_mm\":%.1f,\"filament_g\":%.2f}", rc, t, mm, g);
+    std::snprintf(out, sizeof out, "{\"rc\":%d,\"time_s\":%.1f,\"filament_mm\":%.17g,\"filament_g\":%.2f}", rc, t, mm, g);
     return out;
 }
 
