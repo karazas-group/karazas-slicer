@@ -535,6 +535,11 @@ Measured but not shipped, to pick up when the stage they live in is rewritten:
   - PRs 16066/16137 (leaks: tree support layers and caches, a static eps,
     cloned gap fill): ported to the 2.4.2 patch anyway, 54/54 identical.
     Reslice RSS levels off after ~3 slices with or without them.
+    eval/heap.cjs, one module through 30 slices of the 46 MB / 925k
+    triangle model plus Benchy and mushroom: the wasm heap goes 256 -> 368
+    -> 531 MB in the first two rounds and then stays flat, identical with
+    and without the fixes. No leak on this path; the heap only keeps its
+    high-water mark, which the pricer clears by recycling the worker.
   - The three Clipper2 ideas tried alone on our Clipper1 (2026-10-26,
     eval/ab.cjs, A/B alternated per case):
     - node allocation: nothing to do, scalable_malloc already maps to
