@@ -520,6 +520,20 @@ Measured but not shipped, to pick up when the stage they live in is rewritten:
   every overlapping tree raw. Rejected for good.
 - Same, the second union before `smooth_outward`: within the limit (largest
   1.7e-4 g), speed change inside the noise (-6% to +4%). Not worth it.
+- OrcaSlicer 2.5.0-alpha (Oct 2026), checked against our tree:
+  - PR 16183 (simplify steps copied the whole PrintConfig per path): ported
+    to the 2.4.2 patch, 54/54 bit-identical, 1-4% faster. simplify.cpp must
+    keep reading the config by reference.
+  - PR 16113 (skip the curled-extrusion estimate): we already skip it with
+    KZ_NO_GCODE.
+  - PR 15969 (Clipper1 -> tuned Clipper2, about 35% faster on their bench,
+    Benchy 56-73%): not exact. Extrusion moves up to 0.05% without supports
+    and organic supports by -0.6% to -2.9%, so tens of grams of difference
+    against a 0.001 g limit. Most of the gain is three ideas we could take
+    on their own and gate one by one: a node allocator for Clipper's
+    internals, the cheaper offset join, and one PolyTree pass per boolean.
+  - PRs 16065/16066/16440 (reslice memory leaks with tree supports): not
+    needed, the pricer throws the worker away after each slice.
 
 ## 11. Later: multicolour
 
