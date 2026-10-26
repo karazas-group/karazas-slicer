@@ -1,3 +1,160 @@
+diff --git a/deps_src/admesh/connect.cpp b/deps_src/admesh/connect.cpp
+index 30a19912..a0f425e6 100644
+--- a/deps_src/admesh/connect.cpp
++++ b/deps_src/admesh/connect.cpp
+@@ -239,6 +239,7 @@ private:
+ 	    return edge_a.facet_number != edge_b.facet_number && edge_a == edge_b;
+ 	}
+ 
++public:
+ 	// Connect edge_a with edge_b, update edge connection statistics.
+ 	static void record_neighbors(stl_file *stl, const HashEdge &edge_a, const HashEdge &edge_b)
+ 	{
+@@ -274,6 +275,7 @@ private:
+ 		}
+ 	}
+ 
++private:
+ 	static void match_neighbors_nearby(stl_file *stl, const HashEdge &edge_a, const HashEdge &edge_b)
+ 	{
+ 		record_neighbors(stl, edge_a, edge_b);
+@@ -426,6 +428,107 @@ private:
+ 	}
+ };
+ 
++// Karaza: the same matching without the hash table. The table pairs each
++// edge with the earliest still-unmatched edge of another facet that has the
++// same key, and keeps every edge it ever stored in a pool that only grows:
++// about 25 MB on a 225k-triangle model. Sorting the edges by a hash of the
++// key (insertion order breaking ties) and pairing first-in-first-out inside
++// each run of equal keys makes exactly the same pairs in 5 MB, faster.
++// Edges are numbered 3 * facet + edge, the order the table saw them in.
++// Returns false for meshes too big to number in 24 bits; the table does those.
++static bool match_edges_sorted(stl_file *stl)
++{
++	const uint64_t nr_edges = uint64_t(stl->stats.number_of_facets) * 3;
++	if (nr_edges == 0 || nr_edges >= (uint64_t(1) << 24))
++		return false;
++	auto load = [stl](uint32_t e, HashEdge &edge) {
++		const stl_facet &facet = stl->facet_start[e / 3];
++		edge.facet_number = int(e / 3);
++		edge.which_edge   = int(e % 3);
++		edge.load_exact(stl, &facet.vertex[e % 3], &facet.vertex[(e % 3 + 1) % 3]);
++	};
++	std::vector<uint64_t> order(nr_edges);
++	{
++		HashEdge edge;
++		for (uint32_t e = 0; e < nr_edges; ++ e) {
++			load(e, edge); // also keeps stats.shortest_edge, as the table did
++			uint64_t h = 1469598103934665603ull;
++			for (uint32_t k : edge.key)
++				h = (h ^ k) * 1099511628211ull;
++			order[e] = (h << 24) | e;
++		}
++	}
++	std::sort(order.begin(), order.end());
++	std::vector<HashEdge> open; // unmatched edges of one run, oldest first
++	for (size_t b = 0; b < order.size();) {
++		size_t r = b + 1;
++		while (r < order.size() && (order[r] >> 24) == (order[b] >> 24))
++			++ r;
++		if (r - b > 1) {
++			open.clear();
++			for (size_t i = b; i < r; ++ i) {
++				HashEdge edge;
++				load(uint32_t(order[i] & 0xFFFFFF), edge);
++				auto it = std::find_if(open.begin(), open.end(), [&edge](const HashEdge &o) { return o.facet_number != edge.facet_number && o == edge; });
++				if (it == open.end())
++					open.push_back(edge);
++				else {
++					HashTableEdges::record_neighbors(stl, edge, *it);
++					open.erase(it);
++				}
++			}
++		}
++		b = r;
++	}
++	return true;
++}
++
++// Admesh's own matching, kept for meshes match_edges_sorted can't number.
++static void match_edges_table(stl_file *stl)
++{
++  	HashTableEdges hash_table(stl->stats.number_of_facets);
++	for (uint32_t i = 0; i < stl->stats.number_of_facets; ++ i) {
++		const stl_facet &facet = stl->facet_start[i];
++		for (int j = 0; j < 3; ++ j) {
++			HashEdge edge;
++			edge.facet_number = i;
++			edge.which_edge = j;
++			edge.load_exact(stl, &facet.vertex[j], &facet.vertex[(j + 1) % 3]);
++			hash_table.insert_edge_exact(stl, edge);
++		}
++	}
++}
++
++#ifdef KZ_ADMESH_CHECK
++// Validation build only: rerun the hash table on a copy and abort if any
++// neighbor or statistic differs from what match_edges_sorted produced.
++static void check_against_table(const stl_file *sorted)
++{
++	stl_file copy = *sorted;
++	copy.stats.connected_edges = copy.stats.connected_facets_1_edge = copy.stats.connected_facets_2_edge = copy.stats.connected_facets_3_edge = 0;
++	for (auto &neighbor : copy.neighbors_start)
++		neighbor.reset();
++	match_edges_table(&copy);
++	// Field by field: padding inside the structs isn't copied, so memcmp would
++	// see leftover bytes.
++	const stl_stats &a = copy.stats, &b = sorted->stats;
++	bool same = a.shortest_edge == b.shortest_edge && a.connected_edges == b.connected_edges && a.connected_facets_1_edge == b.connected_facets_1_edge &&
++		a.connected_facets_2_edge == b.connected_facets_2_edge && a.connected_facets_3_edge == b.connected_facets_3_edge &&
++		copy.neighbors_start.size() == sorted->neighbors_start.size();
++	for (size_t i = 0; same && i < copy.neighbors_start.size(); ++ i)
++		for (int k = 0; k < 3; ++ k)
++			if (copy.neighbors_start[i].neighbor[k] != sorted->neighbors_start[i].neighbor[k] ||
++			    copy.neighbors_start[i].which_vertex_not[k] != sorted->neighbors_start[i].which_vertex_not[k]) {
++				fprintf(stderr, "KZ facet %zu edge %d: table %d/%d sorted %d/%d\n", i, k, copy.neighbors_start[i].neighbor[k], copy.neighbors_start[i].which_vertex_not[k],
++				        sorted->neighbors_start[i].neighbor[k], sorted->neighbors_start[i].which_vertex_not[k]);
++				same = false;
++				break;
++			}
++	fprintf(stderr, "KZ_ADMESH_CHECK facets %u edges %d shortest %g %s\n", b.number_of_facets, b.connected_edges, b.shortest_edge, same ? "SAME" : "DIFFERENT");
++	if (!same) abort();
++}
++#endif
++
+ // This function builds the neighbors list.  No modifications are made
+ // to any of the facets.  The edges are said to match only if all six
+ // floats of the first edge matches all six floats of the second edge.
+@@ -454,22 +557,15 @@ void stl_check_facets_exact(stl_file *stl)
+ 		  	++ i;
+   	}
+ 
+-  	// Initialize hash table.
+-  	HashTableEdges hash_table(stl->stats.number_of_facets);
+ 	for (auto &neighbor : stl->neighbors_start)
+ 		neighbor.reset();
+ 
+-  	// Connect neighbor edges.
+-	for (uint32_t i = 0; i < stl->stats.number_of_facets; ++ i) {
+-		const stl_facet &facet = stl->facet_start[i];
+-		for (int j = 0; j < 3; ++ j) {
+-			HashEdge edge;
+-			edge.facet_number = i;
+-			edge.which_edge = j;
+-			edge.load_exact(stl, &facet.vertex[j], &facet.vertex[(j + 1) % 3]);
+-			hash_table.insert_edge_exact(stl, edge);
+-		}
+-	}
++	if (match_edges_sorted(stl)) {
++#ifdef KZ_ADMESH_CHECK
++		check_against_table(stl);
++#endif
++	} else
++		match_edges_table(stl);
+ 
+ #if 0
+ 	printf("Number of faces: %d, number of manifold edges: %d, number of connected edges: %d, number of unconnected edges: %d\r\n", 
 diff --git a/deps_src/admesh/stlinit.cpp b/deps_src/admesh/stlinit.cpp
 index a69bd549..c2d8696f 100644
 --- a/deps_src/admesh/stlinit.cpp
