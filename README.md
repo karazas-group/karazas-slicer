@@ -216,3 +216,13 @@ node $OUT/out/orca_fixed.js model.stl "machine.json;process.json;pla.json" out.g
 ```
 
 It prints `rc=0 time_s=... filament_mm=... filament_g=...`.
+
+## Getting a build onto the website
+
+`wasm/publish.sh` copies `out/web/kz-slicer.{js,wasm}` into `dist/` with a
+`dist/BUILD` note (source commit, patch hash). Commit and push `dist/` to main.
+`.github/workflows/website-import.yml` then puts it on the website's dev
+branch (needs the `WEBSITE_TOKEN` secret); without the token, the website's
+own `slicer import` workflow picks it up on its next dev push. Either way the
+website's `build/slicer-import.sh` minifies the js, slices four models with
+the old and new build, and commits with both sets of grams in the message.
