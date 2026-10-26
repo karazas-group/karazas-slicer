@@ -115,6 +115,22 @@ From the first spike (full write-up in `REPORT.md`):
   the 18 pricer cases at 2/15 15.3 s to 13.4 s. What's left in Clipper is
   spread over the sweep itself (building the intersection list, the
   active edge list), with no single step to cut.
+- Memory (Oct 26). The wasm memory starts at 256 MB, but a slice only
+  touches part of it; what's touched stays resident, because wasm memory
+  can't be handed back short of ending the worker. Benchy with supports at
+  2/15 touched 82 MB, and 43 MB of that was loading the STL: admesh matches
+  triangle edges through a hash table whose pool keeps every edge it ever
+  stored. The patch makes the same pairs by sorting the edges by a hash of
+  their key and pairing first-in-first-out within each key, in a 5 MB
+  array (the table is kept for meshes over 16M edges). Checked by a build
+  that runs both on every load and compares neighbours and stats: the same
+  on the 10 eval models and 12 random non-manifold meshes, and the same
+  grams on the 28 cases. Loading Benchy now touches 28 MB instead of 43,
+  and after a few slices the worker holds about 95 MB instead of about
+  119. Time is unchanged. The rest is the slice itself (walls about 18 MB,
+  supports about 15 MB) and each thread's allocator keeping pages the others
+  can't reuse, which is why the second slice settles 20-30 MB higher than
+  the first. mimalloc's retain and purge options made no difference.
 - Found, not done yet: Voronoi in Arachne falls back to exact big-integer
   maths on round parts (cup on the S1 spends 77% of its time in Arachne).
   The website's pricer uses the classic wall generator, so it doesn't hit
@@ -151,7 +167,7 @@ open: preloading makes the first quote faster but costs 2 MB on limited data.
 - `patches/orca-2.4.2-wasm.patch`: the small source patches (STEP and
   JPEG cut out, two 32-bit `size_t` fixes, a missing include, the platform
   check, `KZ_NO_GCODE` guards on G-code export in Print.cpp, admesh's
-  binary STL detection, the Clipper offset fix, organic supports alongside
+  binary STL detection and edge matching, the Clipper offset fix, organic supports alongside
   infill, the lazy convex hull and the skipped G-code-only steps). The admesh fix is in
   `deps.sh`'s objects (`libdeps.a`), not libslic3r. Clipper is compiled into
   both: `deps.sh` builds `deps_src/clipper` into `libdeps.a`, and libslic3r's
