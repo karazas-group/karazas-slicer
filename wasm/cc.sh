@@ -4,9 +4,9 @@ W=${ORCA_WASM:-$HOME/orca-wasm}; HERE=$(cd "$(dirname "$0")" && pwd); OUT=${OUT:
 source $W/emsdk/emsdk_env.sh >/dev/null 2>&1
 O=$W/orca; D=$O/deps_src; P=$W/prefix-mt; S=$W/deps-src
 src=$1; shift
-out=$OUT/obj/$(echo $src | tr '/' '_').o
+out=$OUT/obj/${OBJ:-$(echo $src | tr '/' '_')}.o
 mkdir -p $OUT/obj $OUT/logs
-log=$OUT/logs/$(echo $src | tr '/' '_').log
+log=$OUT/logs/${OBJ:-$(echo $src | tr '/' '_')}.log
 start=$(date +%s)
 em++ -std=c++17 -O2 -pthread -fwasm-exceptions -DNDEBUG -DUSE_TBB -DTBB_USE_CAPTURED_EXCEPTION=0 -DBOOST_ALL_NO_LIB -DSLIC3R_NO_STEP -DSLIC3R_NO_JPEG \
   -DBBL_RELEASE_TO_PUBLIC=1 -DGIT_COMMIT_HASH='"8500fcd"' \
