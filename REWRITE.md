@@ -46,6 +46,26 @@ union in the organic supports changed nothing at 0.01 g but changed the
 plastic on 6 of 28 cases at full precision; that is the kind of thing the
 per-stage dump catches early.
 
+When a change can't be bit-identical (Clipper output order in the organic
+supports, for one), the owner's limit is 0.001 g on every case:
+`node eval/gate.cjs <js> --tol=0.001` passes cases within that and prints
+the largest difference. Such a change also needs a visual check of the
+supports against native Orca, because grams can hide a support that moved:
+
+```
+bash wasm/link_check.sh                                  # validation build, writes G-code
+node eval/gcode.cjs $OUT/out/check/kz-slicer.js <model.stl> ours.gcode
+python3 eval/native_gcode.py <website>/build/profiles <model.stl> orca.gcode   # eval/app = Orca AppImage extract
+python3 eval/supports_view.py ours.gcode ours orca.gcode orca view.png
+```
+
+`supports_view.py` draws front, side and top views of both with supports in
+red, and prints the support length per file and the most different layer.
+Baseline on 2026-10-26, today's build vs native Orca 2.4.2 with the same
+settings: Benchy 49562.8 vs 49562.7 mm of support over 185 layers each,
+mushroom identical, sphere40 +0.09%, inverted cone +0.37% (Orca's arrange
+turns the model a little on its bed, which moves the trees slightly).
+
 The old 28-case matrix over the P2S and S1 printer profiles is retired
 (2026-10-26, owner's decision): the slicer no longer knows about printers,
 and S1 was the only thing keeping Arachne in.
@@ -248,11 +268,15 @@ Follows from the closed set (no further decision needed):
   `estimate_curled_extrusions` and `detect_overhangs_for_lift` (already
   skipped).
 - Wipe tower and multi-material: `Print::_make_wipe_tower`, `ToolOrdering`,
-  `apply_mm_segmentation`, multi-extruder region splitting. Note the pipeline
+  `apply_mm_segmentation`, multi-extruder region splitting. Out of the STL
+  pricing path, but not deleted: the owner wants the wipe tower and the 3MF
+  importer kept as source to read and rebuild as their own modules for 3MF
+  imports and colour prints later (section 11). Note the pipeline
   goes through `ToolOrdering` today because `Print::process` and the skirt
   step use it for `tools_for_layer`; replacing that is part of `process.cpp`.
-- 3MF/OBJ/AMF/STEP readers, the preset system, the placeholder parser
-  (already stubbed).
+- OBJ/AMF/STEP readers, the preset system, the placeholder parser (already
+  stubbed). The 3MF reader is stubbed out of the pricing link too, but its
+  source stays for the 3MF module (section 11).
 - Sequential printing, raft, spiral vase, `contour_z`, conical overhang, fuzzy
   skin, `slicing_mode` other than regular, adaptive and variable layer
   heights, shared objects, multiple objects and instances.
@@ -488,17 +512,20 @@ Measured but not shipped, to pick up when the stage they live in is rewritten:
   computation order changes, so it needs the full-precision gate.
 - Organic supports, smoothing setup cache (`organic_smooth_branches_avoid_collisions`):
   about 6 ms of per-layer setup.
-- Organic supports, the per-tree union in `organic_draw_branches`: 0.52 s
-  wall on the inverted cone (3.4 s thread time). Removing it changes the
-  plastic by up to 0.00005 g on 6 of 28 cases. Rejected under the exact rule;
-  owner asked why, decision pending.
-- Same, the second union before `smooth_outward`: ~0.1 s thread time,
-  changes up to 0.00006 g on 4 cases. Same status.
+- Organic supports, the per-tree union in `organic_draw_branches`: tried
+  again under the 0.001 g rule on 2026-10-26. Within it (42/54 identical,
+  largest 1.2e-5 g), but SLOWER: inverted cone 3.3 -> 5.2 s, sphere40
+  1.4 -> 1.8 s (medians of 4 interleaved runs). The per-tree union shrinks
+  each tree before the big per-layer union; without it that one union gets
+  every overlapping tree raw. Rejected for good.
+- Same, the second union before `smooth_outward`: within the limit (largest
+  1.7e-4 g), speed change inside the noise (-6% to +4%). Not worth it.
 
 ## 11. Later: multicolour
 
-Not now. Once the generators export colours in their 3MF files (open in
-Linear), the pricer could send a 3MF to the slicer and price each colour. In
+Not now. Orca's 3MF importer and wipe tower stay in the source tree for
+this (not deleted, just not linked). Once the generators export colours in
+their 3MF files (open in Linear), the pricer could send a 3MF to the slicer and price each colour. In
 the module layout that is a separate reader stage (`load_3mf.cpp`) and a
 colour/tool split stage in front of `slice`, used only when a 3MF with
 colours comes in; STL pricing doesn't load it. Until then everything above
