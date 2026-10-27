@@ -366,6 +366,22 @@ index 2d2cf989..9fa1f677 100644
      {
          if (switching_radius > left.toolpath_locations[next_inset_idx])
          {
+diff --git a/src/libslic3r/Fill/FillBase.cpp b/src/libslic3r/Fill/FillBase.cpp
+index 93586679..d9a87b2d 100644
+--- a/src/libslic3r/Fill/FillBase.cpp
++++ b/src/libslic3r/Fill/FillBase.cpp
+@@ -239,10 +239,7 @@ void Fill::_create_gap_fill(const Surface* surface, const FillParams& params, Ex
+                 return p.length() < scale_(params.config->filter_out_gap_fill.value);
+             }), polylines.end());
+ 
+-            ExtrusionEntityCollection gap_fill;
+-            variable_width(polylines, erGapFill, params.flow, gap_fill.entities);
+-            auto gap = std::move(gap_fill.entities);
+-            out->append(gap);
++            variable_width(polylines, erGapFill, params.flow, out->entities);
+         }
+     }
+ }
 diff --git a/src/libslic3r/GCode.hpp b/src/libslic3r/GCode.hpp
 index 176af4c5..d98593db 100644
 --- a/src/libslic3r/GCode.hpp
@@ -379,6 +395,22 @@ index 176af4c5..d98593db 100644
  };
  
  class GCode {
+diff --git a/src/libslic3r/GCode/GCodeProcessor.cpp b/src/libslic3r/GCode/GCodeProcessor.cpp
+index 44cb185a..f81d3134 100644
+--- a/src/libslic3r/GCode/GCodeProcessor.cpp
++++ b/src/libslic3r/GCode/GCodeProcessor.cpp
+@@ -1652,8 +1652,9 @@ void GCodeProcessorResult::reset() {
+     //BBS: add mutex for protection of gcode result
+     lock();
+ 
+-    moves.clear();
+-    lines_ends.clear();
++    // moves and lines_ends grow with the print: free them, as no reset result reuses the capacity.
++    clear_and_shrink(moves);
++    clear_and_shrink(lines_ends);
+     printable_area = Pointfs();
+     //BBS: add bed exclude area
+     bed_exclude_area = Pointfs();
 diff --git a/src/libslic3r/GCode/Thumbnails.cpp b/src/libslic3r/GCode/Thumbnails.cpp
 index 526ba824..0de835ac 100644
 --- a/src/libslic3r/GCode/Thumbnails.cpp
@@ -415,6 +447,68 @@ index 526ba824..0de835ac 100644
  }
  
  std::unique_ptr<CompressedImageBuffer> compress_thumbnail_qoi(const ThumbnailData &data)
+diff --git a/src/libslic3r/Layer.cpp b/src/libslic3r/Layer.cpp
+index 5bdc156d..b7896a66 100644
+--- a/src/libslic3r/Layer.cpp
++++ b/src/libslic3r/Layer.cpp
+@@ -344,7 +344,7 @@ void Layer::simplify_support_entity_collection(ExtrusionEntityCollection* entity
+ //BBS: method to simplify support path
+ void Layer::simplify_support_path(ExtrusionPath * path)
+ {
+-    const auto print_config = this->object()->print()->config();
++    const auto &print_config = this->object()->print()->config();
+     const bool spiral_mode = print_config.spiral_mode;
+     const bool enable_arc_fitting = print_config.enable_arc_fitting;
+     const auto scaled_resolution = scaled<double>(print_config.resolution.value);
+@@ -359,7 +359,7 @@ void Layer::simplify_support_path(ExtrusionPath * path)
+ //BBS: method to simplify support path
+ void Layer::simplify_support_multi_path(ExtrusionMultiPath* multipath)
+ {
+-    const auto print_config = this->object()->print()->config();
++    const auto &print_config = this->object()->print()->config();
+     const bool spiral_mode = print_config.spiral_mode;
+     const bool enable_arc_fitting = print_config.enable_arc_fitting;
+     const auto scaled_resolution = scaled<double>(print_config.resolution.value);
+@@ -376,7 +376,7 @@ void Layer::simplify_support_multi_path(ExtrusionMultiPath* multipath)
+ //BBS: method to simplify support path
+ void Layer::simplify_support_loop(ExtrusionLoop* loop)
+ {
+-    const auto print_config = this->object()->print()->config();
++    const auto &print_config = this->object()->print()->config();
+     const bool spiral_mode = print_config.spiral_mode;
+     const bool enable_arc_fitting = print_config.enable_arc_fitting;
+     const auto scaled_resolution = scaled<double>(print_config.resolution.value);
+diff --git a/src/libslic3r/LayerRegion.cpp b/src/libslic3r/LayerRegion.cpp
+index 22e0a268..6471a915 100644
+--- a/src/libslic3r/LayerRegion.cpp
++++ b/src/libslic3r/LayerRegion.cpp
+@@ -1070,7 +1070,7 @@ void LayerRegion::simplify_entity_collection(ExtrusionEntityCollection* entity_c
+ 
+ void LayerRegion::simplify_path(ExtrusionPath* path)
+ {
+-    const auto print_config = this->layer()->object()->print()->config();
++    const auto &print_config = this->layer()->object()->print()->config();
+     const bool spiral_mode = print_config.spiral_mode;
+     const bool enable_arc_fitting = print_config.enable_arc_fitting;
+     const auto scaled_resolution = scaled<double>(print_config.resolution.value);
+@@ -1088,7 +1088,7 @@ void LayerRegion::simplify_path(ExtrusionPath* path)
+ 
+ void LayerRegion::simplify_multi_path(ExtrusionMultiPath* multipath)
+ {
+-    const auto print_config = this->layer()->object()->print()->config();
++    const auto &print_config = this->layer()->object()->print()->config();
+     const bool spiral_mode = print_config.spiral_mode;
+     const bool enable_arc_fitting = print_config.enable_arc_fitting;
+     const auto scaled_resolution = scaled<double>(print_config.resolution.value);
+@@ -1108,7 +1108,7 @@ void LayerRegion::simplify_multi_path(ExtrusionMultiPath* multipath)
+ 
+ void LayerRegion::simplify_loop(ExtrusionLoop* loop)
+ {
+-    const auto print_config = this->layer()->object()->print()->config();
++    const auto &print_config = this->layer()->object()->print()->config();
+     const bool spiral_mode = print_config.spiral_mode;
+     const bool enable_arc_fitting = print_config.enable_arc_fitting;
+     const auto scaled_resolution = scaled<double>(print_config.resolution.value);
 diff --git a/src/libslic3r/LocalesUtils.cpp b/src/libslic3r/LocalesUtils.cpp
 index d3210723..2c39a530 100644
 --- a/src/libslic3r/LocalesUtils.cpp
@@ -543,7 +637,7 @@ index 33875211..4d63a485 100644
      BOOST_LOG_TRIVIAL(info) << "Platform: OpenBSD";
  	s_platform 		  = Platform::BSDUnix;
 diff --git a/src/libslic3r/Print.cpp b/src/libslic3r/Print.cpp
-index e25ef7db..beeef7ad 100644
+index e25ef7db..6b85c8fe 100644
 --- a/src/libslic3r/Print.cpp
 +++ b/src/libslic3r/Print.cpp
 @@ -33,6 +33,7 @@
@@ -554,7 +648,23 @@ index e25ef7db..beeef7ad 100644
  
  //BBS: add json support
  #include "nlohmann/json.hpp"
-@@ -2299,7 +2300,12 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
+@@ -2093,6 +2094,15 @@ void  PrintObject::clear_shared_object()
+ void  PrintObject::copy_layers_from_shared_object()
+ {
+     if (m_shared_object) {
++        // Orca: Print::process() calls this once per slice for each sharing object, after clear_shared_object() has
++        // emptied any earlier alias, so the vectors hold only layers this object sliced itself before it started sharing
++        // (or nothing). Free them here, as clear_support_layers() / clear_layers() would; those skip deletion while
++        // m_shared_object is set. The belt-only data they also free is always empty here, because belt printers never
++        // share layers.
++        for (SupportLayer *layer : m_support_layers)
++            delete layer;
++        for (Layer *layer : m_layers)
++            delete layer;
+         m_layers.clear();
+         m_support_layers.clear();
+ 
+@@ -2299,7 +2309,12 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
              }
          }
          for (PrintObject *obj : m_objects) {
@@ -567,7 +677,7 @@ index e25ef7db..beeef7ad 100644
                  obj->estimate_curled_extrusions();
              }
              else {
-@@ -2307,6 +2313,20 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
+@@ -2307,6 +2322,20 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
                      obj->set_done(posEstimateCurledExtrusions);
              }
          }
@@ -588,7 +698,7 @@ index e25ef7db..beeef7ad 100644
          for (PrintObject *obj : m_objects) {
              if (need_slicing_objects.count(obj) != 0) {
                  obj->infill();
-@@ -2339,6 +2359,8 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
+@@ -2339,6 +2368,8 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
              }
          }
  
@@ -597,7 +707,7 @@ index e25ef7db..beeef7ad 100644
          tbb::parallel_for(tbb::blocked_range<int>(0, int(m_objects.size())),
              [this, need_slicing_objects](const tbb::blocked_range<int>& range) {
                  for (int i = range.begin(); i < range.end(); i++) {
-@@ -2355,7 +2377,12 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
+@@ -2355,7 +2386,12 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
          );
  
          for (PrintObject* obj : m_objects) {
@@ -610,7 +720,7 @@ index e25ef7db..beeef7ad 100644
                  obj->detect_overhangs_for_lift();
              }
              else {
-@@ -2617,6 +2644,11 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
+@@ -2617,6 +2653,11 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
  // It is up to the caller to show an error message.
  std::string Print::export_gcode(const std::string& path_template, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
  {
@@ -622,7 +732,7 @@ index e25ef7db..beeef7ad 100644
      // output everything to a G-code file
      // The following call may die if the filename_format template substitution fails.
      std::string path = this->output_filepath(path_template);
-@@ -2641,6 +2673,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
+@@ -2641,6 +2682,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
      if (result != nullptr)
          result->conflict_result = m_conflict_result;
      return path.c_str();
@@ -630,7 +740,7 @@ index e25ef7db..beeef7ad 100644
  }
  
  void Print::_make_skirt()
-@@ -3756,6 +3789,9 @@ void Print::set_gcode_file_invalidated()
+@@ -3756,6 +3798,9 @@ void Print::set_gcode_file_invalidated()
  //BBS: add gcode file preload logic
  void Print::export_gcode_from_previous_file(const std::string& file, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
  {
@@ -640,7 +750,7 @@ index e25ef7db..beeef7ad 100644
      try {
          GCodeProcessor processor;
          GCodeProcessor::s_IsBBLPrinter = is_BBL_printer();
-@@ -3772,6 +3808,7 @@ void Print::export_gcode_from_previous_file(const std::string& file, GCodeProces
+@@ -3772,6 +3817,7 @@ void Print::export_gcode_from_previous_file(const std::string& file, GCodeProces
      }
  
      BOOST_LOG_TRIVIAL(info) << __FUNCTION__ <<  boost::format(":  process the G-code file %1% successfully")%file.c_str();
@@ -648,3 +758,133 @@ index e25ef7db..beeef7ad 100644
  }
  
  std::tuple<float, float> Print::object_skirt_offset(double margin_height) const
+diff --git a/src/libslic3r/PrintObject.cpp b/src/libslic3r/PrintObject.cpp
+index 925da0c5..aed62ecc 100644
+--- a/src/libslic3r/PrintObject.cpp
++++ b/src/libslic3r/PrintObject.cpp
+@@ -890,6 +890,9 @@ void PrintObject::generate_support_material()
+             this->_generate_support_material();
+             m_print->throw_if_canceled();
+         }
++        // Orca: the tree support collision/avoidance caches and support nodes are only used while this step runs
++        // (detect_overhangs() rebuilds them from scratch), so don't keep them resident until the next slice.
++        this->clear_tree_support_preview_cache();
+         this->set_done(posSupportMaterial);
+     }
+ }
+diff --git a/src/libslic3r/PrintObjectSlice.cpp b/src/libslic3r/PrintObjectSlice.cpp
+index 07eb885e..ce0ca85f 100644
+--- a/src/libslic3r/PrintObjectSlice.cpp
++++ b/src/libslic3r/PrintObjectSlice.cpp
+@@ -1339,7 +1339,7 @@ void PrintObject::slice_volumes()
+                         if (min_growth < 0.f || elfoot > 0.f) {
+                             // Apply the negative XY compensation. (the ones that is <0)
+                             ExPolygons trimming;
+-                            static const float eps = float(scale_(m_config.slice_closing_radius.value) * 1.5);
++                            const float eps = float(scale_(m_config.slice_closing_radius.value) * 1.5);
+                             if (elfoot > 0.f) {
+                                 ExPolygons expolygons_to_compensate = offset_ex(layer->merged(eps), -eps);
+                                 lslices_elfoot_uncompensated[layer_id] = expolygons_to_compensate;
+diff --git a/src/libslic3r/Support/TreeSupport.cpp b/src/libslic3r/Support/TreeSupport.cpp
+index 0a8cda61..10797508 100644
+--- a/src/libslic3r/Support/TreeSupport.cpp
++++ b/src/libslic3r/Support/TreeSupport.cpp
+@@ -1829,37 +1829,15 @@ coordf_t TreeSupport::get_radius(const SupportNode* node)
+     return node->radius;
+ }
+ 
+-ExPolygons TreeSupport::get_avoidance(coordf_t radius, size_t obj_layer_nr)
++// Orca: drop_nodes() calls these several times per node per layer, so they return a reference into the
++// TreeSupportData cache. The cache only ever inserts, so its entries never move while nodes drop in parallel.
++const ExPolygons& TreeSupport::get_avoidance(coordf_t radius, size_t obj_layer_nr)
+ {
+-#if USE_SUPPORT_3D
+-    if (m_model_volumes) {
+-        bool on_build_plate = m_object_config->support_on_build_plate_only.value;
+-        const Polygons& avoid_polys = m_model_volumes->getAvoidance(radius, obj_layer_nr, TreeSupport3D::TreeModelVolumes::AvoidanceType::FastSafe, on_build_plate, true);
+-        ExPolygons expolys;
+-        for (auto& poly : avoid_polys)
+-            expolys.emplace_back(std::move(poly));
+-        return expolys;
+-    }
+-    return ExPolygons();
+-#else
+     return m_ts_data->get_avoidance(radius, obj_layer_nr);
+-#endif
+ }
+-ExPolygons TreeSupport::get_collision(coordf_t radius, size_t layer_nr)
++const ExPolygons& TreeSupport::get_collision(coordf_t radius, size_t layer_nr)
+ {
+-#if USE_SUPPORT_3D
+-    if (m_model_volumes) {
+-        bool on_build_plate = m_object_config->support_on_build_plate_only.value;
+-        const Polygons& collision_polys = m_model_volumes->getCollision(radius, layer_nr, true);
+-        ExPolygons expolys;
+-        for (auto& poly : collision_polys)
+-            expolys.emplace_back(std::move(poly));
+-        return expolys;
+-    }
+-#else
+     return m_ts_data->get_collision(radius, layer_nr);
+-#endif
+-    return ExPolygons();
+ }
+ Polygons TreeSupport::get_collision_polys(coordf_t radius, size_t layer_nr)
+ {
+@@ -2638,7 +2616,12 @@ void TreeSupport::draw_circles()
+ #endif  // SUPPORT_TREE_DEBUG_TO_SVG
+ 
+     SupportLayerPtrs& ts_layers = m_object->support_layers();
+-    auto iter = std::remove_if(ts_layers.begin(), ts_layers.end(), [](SupportLayer* ts_layer) { return ts_layer->height < EPSILON; });
++    // Orca: the vector owns its layers, so the dropped ones are deleted before they are erased.
++    // std::stable_partition (unlike std::remove_if) leaves exactly the dropped layers in the tail.
++    // Only heights below EPSILON are dropped; written as !(height < EPSILON), a NaN height is kept.
++    auto iter = std::stable_partition(ts_layers.begin(), ts_layers.end(), [](SupportLayer* ts_layer) { return !(ts_layer->height < EPSILON); });
++    for (auto it = iter; it != ts_layers.end(); ++it)
++        delete *it;
+     ts_layers.erase(iter, ts_layers.end());
+     for (int layer_nr = 0; layer_nr < ts_layers.size(); layer_nr++) {
+         ts_layers[layer_nr]->upper_layer = layer_nr != ts_layers.size() - 1 ? ts_layers[layer_nr + 1] : nullptr;
+@@ -2879,7 +2862,7 @@ void TreeSupport::drop_nodes()
+                     //Insert a completely new node and let both original nodes fade.
+                     Point next_position = (node.position + neighbours[0]) / 2; //Average position of the two nodes.
+                     coordf_t next_radius = calc_radius(node.dist_mm_to_top+height_next);
+-                    auto avoid_layer = get_avoidance(next_radius, obj_layer_nr_next);
++                    const ExPolygons& avoid_layer = get_avoidance(next_radius, obj_layer_nr_next);
+                     if (group_index == 0)
+                     {
+                         //Avoid collisions.
+@@ -3039,7 +3022,7 @@ void TreeSupport::drop_nodes()
+                 }
+ #endif
+                 coordf_t next_radius = calc_radius(node.dist_mm_to_top + height_next);
+-                auto avoidance_next = get_avoidance(next_radius, obj_layer_nr_next);
++                const ExPolygons& avoidance_next = get_avoidance(next_radius, obj_layer_nr_next);
+ 
+                 Point  to_outside         = projection_onto(avoidance_next, node.position);
+                 Point  direction_to_outer = to_outside - node.position;
+@@ -3093,7 +3076,7 @@ void TreeSupport::drop_nodes()
+                         if (is_outside) { next_layer_vertex = candidate_vertex; }
+                     }
+                 }
+-                auto              next_collision = get_collision(0, obj_layer_nr_next);
++                const ExPolygons& next_collision = get_collision(0, obj_layer_nr_next);
+                 const bool   to_buildplate  = !is_inside_ex(m_ts_data->m_layer_outlines[obj_layer_nr_next], next_layer_vertex);
+                 SupportNode *     next_node     = m_ts_data->create_node(next_layer_vertex, node.distance_to_top + 1, obj_layer_nr_next,
+                     node.support_roof_layers_below - (node.distance_to_top > 0 ? 1 : 0),
+diff --git a/src/libslic3r/Support/TreeSupport.hpp b/src/libslic3r/Support/TreeSupport.hpp
+index e0446ad5..623ffbcd 100644
+--- a/src/libslic3r/Support/TreeSupport.hpp
++++ b/src/libslic3r/Support/TreeSupport.hpp
+@@ -511,9 +511,9 @@ private:
+     coordf_t calc_branch_radius(coordf_t base_radius, coordf_t mm_to_top, double diameter_angle_scale_factor, bool use_min_distance=true);
+     coordf_t   calc_radius(coordf_t mm_to_top);
+     coordf_t get_radius(const SupportNode* node);
+-    ExPolygons get_avoidance(coordf_t radius, size_t obj_layer_nr);
++    const ExPolygons& get_avoidance(coordf_t radius, size_t obj_layer_nr);
+     // layer's expolygon expanded by radius+m_xy_distance
+-    ExPolygons get_collision(coordf_t radius, size_t layer_nr);
++    const ExPolygons& get_collision(coordf_t radius, size_t layer_nr);
+     // get Polygons instead of ExPolygons
+     Polygons get_collision_polys(coordf_t radius, size_t layer_nr);
+ 

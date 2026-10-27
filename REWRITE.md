@@ -564,3 +564,36 @@ the module layout that is a separate reader stage (`load_3mf.cpp`) and a
 colour/tool split stage in front of `slice`, used only when a 3MF with
 colours comes in; STL pricing doesn't load it. Until then everything above
 assumes one material.
+
+## 12. Clipper2 branch (this branch)
+
+This branch uses Clipper2 (OrcaSlicer PR 15969, Clipper 2.0.1) as the clipping
+module instead of Clipper1. `deps_src/clipper/` and `libslic3r/clipper.cpp`
+are gone; `ClipperUtils.cpp` wraps `deps_src/clipper2`, and `ClipperZUtils.cpp`
+is new. The port is `patches/clipper2.patch`, a diff on top of
+`patches/orca-2.4.2-wasm.patch`.
+
+Measured (2026-10-27, `eval/ab.cjs`, A = Clipper1 `leak` build, B = this
+build, 2 reps alternated per case): B/A = 0.767 (133.6 s -> 102.4 s over the
+54 cases). Per model: cup 0.54, hollowbox40 0.72, benchy 0.70, sphere40
+0.76, mushroom 0.85, invcone 0.89, cube20 0.94.
+
+Grams: `eval/gate.cjs --tol=1` passes, largest difference 0.0345 g (invcone,
+with supports). The results are no longer bit-identical to Clipper1, so the
+gate's golden file is now the Clipper2 baseline: `eval/golden-mm.txt` was
+rewritten with `gate.cjs --write` and `gate.cjs` (no flags) gives 54/54
+identical. Clipper1 golden numbers are only in git history before this
+branch's commit.
+
+Rebuild:
+1. Clean Orca 2.4.2 git HEAD, then `patch -p1 < patches/orca-2.4.2-wasm.patch`.
+2. Then `patch -p1 < patches/clipper2.patch` (no rejects on the current main patch).
+3. `ORCA_WASM=<root> OUT=<build> bash wasm/cc.sh <file>` for every line of
+   `wasm/libslic3r-sources.txt` (minus `clipper.cpp` and `Clipper2Utils.cpp`,
+   plus `ClipperZUtils.cpp`); a few sources fail for missing optional
+   libraries (nlopt, openvdb, OCCT, CGAL LEDA) as before, and those are
+   not in the archive either way.
+4. `bash wasm/deps.sh` (Clipper2 sources, with prefix-mt for the TBB allocator
+   header), then assemble `libdeps.a`: from the Clipper1 archive remove
+   `clipper_*` members, add the `c2_*` objects.
+5. `bash wasm/roots.sh`, then `bash wasm/link_web.sh`.
