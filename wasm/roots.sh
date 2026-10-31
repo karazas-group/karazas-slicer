@@ -1,26 +1,21 @@
 #!/usr/bin/env bash
-# Compiles the driver and the pricing build's stand-ins into $OUT/roots/,
-# which link_web.sh and link_check.sh put ahead of libslic3r_all.a.
-#   driver.o        the pricer's entry point (kz_slice), no G-code
-#   driver_check.o  the same with -DKZ_GCODE: also writes G-code and prints
-#                   Orca's own filament numbers next to the summed ones
-#   print.o         Print.cpp with -DKZ_NO_GCODE (export_gcode throws)
-#   readers.o layers.o notower.o noparser.o shims.o   see each file's header
+# Compiles everything listed in kz/sources.txt into $OUT/roots/<name>.o, which
+# link_web.sh and link_check.sh put ahead of libslic3r_all.a. Stage files are
+# described in REWRITE.md; stand-ins in the header of each kz/stubs file.
+# Usage: roots.sh [name ...]   (no names: all)
 W=${ORCA_WASM:-$HOME/orca-wasm}; HERE=$(cd "$(dirname "$0")" && pwd); OUT=${OUT:-$W/build}
+REPO=$(dirname "$HERE")
 mkdir -p $OUT/roots
-rel=$(realpath --relative-to=$W/orca/src/libslic3r $HERE/driver)
-one() { # one <name> <src relative to libslic3r> [flags]
-  local name=$1 src=$2; shift 2
-  bash $HERE/cc.sh $src "$@" && mv $OUT/obj/$(echo $src | tr '/' '_').o $OUT/roots/$name.o
-}
-one driver       $rel/wasm_driver.cpp &
-one shims        $rel/wasm_shims.cpp &
-one readers      $rel/wasm_readers.cpp &
-wait
-# Both driver builds compile through the same object path, so not in one wave.
-one driver_check $rel/wasm_driver.cpp -DKZ_GCODE &
-one layers       $rel/wasm_layers.cpp &
-one notower      $rel/wasm_notower.cpp &
-one noparser     $rel/wasm_noparser.cpp &
-one print        Print.cpp -DKZ_NO_GCODE &
+want=" $* "
+while read -r name link src flags; do
+  case "$name" in ''|'#'*) continue;; esac
+  [ "$want" = "  " ] || case "$want" in *" $name "*) ;; *) continue;; esac
+  case "$src" in
+    orca:*) rel=${src#orca:} ;;
+    *)      rel=$(realpath --relative-to=$W/orca/src/libslic3r $REPO/$src) ;;
+  esac
+  # one cc.sh per object, four at a time; OBJ keeps two builds of one source apart
+  ( OBJ=roots_$name bash $HERE/cc.sh $rel $flags && mv $OUT/obj/roots_$name.o $OUT/roots/$name.o ) &
+  while [ $(jobs -r | wc -l) -ge 4 ]; do wait -n; done
+done < $REPO/kz/sources.txt
 wait
