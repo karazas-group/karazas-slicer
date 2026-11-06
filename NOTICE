@@ -1,0 +1,74 @@
+Karaza slicer
+Copyright (C) 2026 Karazas (https://karazas.com), Amman, Jordan
+
+Based on OrcaSlicer 2.4.2 (https://github.com/SoftFever/OrcaSlicer), which
+is based on Bambu Studio, PrusaSlicer and Slic3r. Their copyrights stay with
+their authors. OrcaSlicer is licensed under the GNU Affero General Public
+License, version 3 (AGPL-3.0), and so is this whole work. The full licence
+is in LICENSE.
+
+This program is distributed WITHOUT ANY WARRANTY; without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+
+WHAT KARAZAS WROTE
+==================
+
+The material Karazas added to OrcaSlicer, and which the additional terms
+below apply to, is:
+
+  - kz/          the driver, the pipeline and the volume sum
+  - patches/     our changes to OrcaSlicer and Clipper2
+  - wasm/        the WebAssembly build scripts and generated build files
+  - eval/        the test and comparison harness
+  - dist/        the built kz-slicer.js and kz-slicer.wasm, as far as they
+                 contain the material above
+  - the documentation in this repository (README.md, REPORT.md, NEXT.md,
+    REWRITE.md, this NOTICE)
+
+OrcaSlicer's own code, inside or outside dist/, is under AGPL-3.0 only,
+with no additional terms from us.
+
+
+ADDITIONAL TERMS (AGPL-3.0, SECTION 7)
+======================================
+
+As section 7 of the GNU Affero General Public License allows, the material
+Karazas wrote (listed above) is licensed under AGPL-3.0 with these
+additional terms. They are part of the licence for that material and go
+with every copy, modified or not.
+
+1. Attribution (section 7(b)).
+
+   Any work that contains this material, or a modified version of it, and
+   that people use through a user interface, including a website or app
+   that runs it in its users' browsers or on a server, must show this
+   notice:
+
+       Slicing by the Karaza slicer (karazas.com), based on OrcaSlicer.
+
+   It has to be visible, legible, and in the same place the slicing
+   results are shown to the user (for example next to the weight, time or
+   price the slicer produced), not only on a separate page. "karazas.com"
+   must link to https://karazas.com where links are possible. A
+   translation of the notice is fine if the interface is in another
+   language. The notice must also appear in the work's Appropriate Legal
+   Notices, next to a way to get the work's source code, as the licence
+   already requires.
+
+2. Modified versions (section 7(c)).
+
+   A modified version must say that it was modified, and by whom, in its
+   Appropriate Legal Notices and in the source. It must not be presented as
+   the original Karaza slicer, or as made or endorsed by Karazas.
+
+3. Names and marks (section 7(e)).
+
+   This licence gives no rights to use the names "Karaza", "Karazas",
+   "Karaza slicer", "Karaza 3D", "Vintage Karaza", or their logos, except
+   in the attribution notice required by term 1 and to describe the
+   origin of the work truthfully.
+
+Removing these terms, or the attribution they require, is a breach of the
+licence, which ends your rights under it (section 8).

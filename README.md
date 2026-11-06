@@ -19,6 +19,13 @@ this source, including our patch and driver. Keeping this repo public and
 linking to it from the site covers that. The licence can't be changed, since
 it comes from OrcaSlicer (and PrusaSlicer and Slic3r before it).
 
+The parts Karazas wrote (`kz/`, `patches/`, `wasm/`, `eval/`, the docs) carry
+additional terms under AGPL section 7, set out in `NOTICE`: anyone who puts
+this slicer behind an interface has to show "Slicing by the Karaza slicer
+(karazas.com), based on OrcaSlicer" where the results appear, must mark
+their changes, and gets no right to the Karaza names. OrcaSlicer's own code
+has no extra terms from us. Keep `NOTICE` with every copy.
+
 ## Where it stands
 
 From the first spike (full write-up in `REPORT.md`):
