@@ -36,3 +36,6 @@ double kz::idle_ms()
     for (auto &s : g_start_us) { int64_t t = s.load(); if (t) sum += now - t; }
     return sum / 1000.0;
 }
+
+// For laps inside Orca files (KZ_IDLE experiments), which don't include kz.hpp.
+extern "C" void kz_lap(const char *phase) { kz::lap(phase); }
