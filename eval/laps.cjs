@@ -1,5 +1,6 @@
 // node eval/laps.cjs kz-slicer.js [reps]: the 54 gate cases with kz::lap
-// markers, summed per phase, split by supports off/on. The first rep warms
+// markers, summed per phase, split by supports off/on. A build with KZ_IDLE
+// (kz/idle.cpp) also prints how busy the threads were in each phase. The first rep warms
 // the module up and isn't counted (unless reps is 1).
 const fs = require('fs'), path = require('path');
 const M = __dirname + '/models/', P = __dirname + '/profiles/karaza.json';
@@ -9,11 +10,12 @@ const ov = (w, i, s) => [['printable_area','0x0,1000x0,1000x1000,0x1000'],['prin
 (async () => {
   let laps = [];
   const F = require(path.resolve(process.argv[2]));
-  const m = await (F.default || F)({ print() {}, printErr(t) { const x = /^T (.+) (\d+)$/.exec(t); if (x) laps.push([x[1], +x[2]]); } });
+  const m = await (F.default || F)({ print() {}, printErr(t) { const x = /^T (.+?) (\d+)(?: (\d+))?$/.exec(t); if (x) laps.push([x[1], +x[2], x[3] === undefined ? null : +x[3]]); } });
   m.FS.mkdir('/p'); m.FS.writeFile('/p/k.json', fs.readFileSync(P));
   const reps = +process.argv[3] || 2;
   const models = fs.readdirSync(M).filter(f => f.endsWith('.stl')).map(f => M + f); models.push(process.env.BENCHY || __dirname + '/models/benchy.stl');
-  const agg = [{}, {}], per = {};
+  const agg = [{}, {}], idle = [{}, {}], per = {};
+  const NT = Math.max(2, Math.min(8, require('os').availableParallelism?.() || require('os').cpus().length)); // TBB threads incl. the caller
   for (let r = 0; r < reps; r++) for (const mf of models) {
     const buf = fs.readFileSync(mf), name = path.basename(mf, '.stl');
     for (const [w, i] of CH) for (const s of [0, 1]) {
@@ -24,6 +26,7 @@ const ov = (w, i, s) => [['printable_area','0x0,1000x0,1000x1000,0x1000'],['prin
       for (let k = 1; k < laps.length; k++) {
         const ph = laps[k - 1][0], ms = laps[k][1];
         agg[s][ph] = (agg[s][ph] || 0) + ms;
+        if (laps[k][2] !== null) idle[s][ph] = (idle[s][ph] || 0) + laps[k][2];
         const key = name + (s ? '+sup' : ''); (per[key] ??= {})[ph] = (per[key][ph] || 0) + ms;
       }
     }
@@ -32,7 +35,9 @@ const ov = (w, i, s) => [['printable_area','0x0,1000x0,1000x1000,0x1000'],['prin
   for (const s of [0, 1]) {
     const tot = Object.values(agg[s]).reduce((a, b) => a + b, 0);
     console.log(`\nsupports ${s ? 'on' : 'off'}: ${(tot / n) | 0} ms per rep`);
-    for (const [ph, ms] of Object.entries(agg[s]).sort((a, b) => b[1] - a[1])) console.log(`  ${(ms / n | 0).toString().padStart(6)}  ${(100 * ms / tot).toFixed(1).padStart(5)}%  ${ph}`);
+    for (const [ph, ms] of Object.entries(agg[s]).sort((a, b) => b[1] - a[1])) console.log(`  ${(ms / n | 0).toString().padStart(6)}  ${(100 * ms / tot).toFixed(1).padStart(5)}%` +
+      (ph in idle[s] ? `  busy ${(100 * Math.max(0, 1 - idle[s][ph] / (ms * NT))).toFixed(0).padStart(3)}%  idle ${(idle[s][ph] / n | 0).toString().padStart(6)} thread-ms` : '') + `  ${ph}`);
+    if (Object.keys(idle[s]).length) { const it = Object.values(idle[s]).reduce((a, b) => a + b, 0); console.log(`  all: busy ${(100 * (1 - it / (tot * NT))).toFixed(0)}% of ${NT} threads`); }
   }
   if (process.env.PER) for (const [k, o] of Object.entries(per)) console.log(k, JSON.stringify(Object.fromEntries(Object.entries(o).map(([a, b]) => [a, b / n | 0]))));
   process.exit(0);
