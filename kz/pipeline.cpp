@@ -93,6 +93,9 @@ int kz::slice_one(const char *stl_path, const char *flat_config_path, const kz::
         // diameter and density: the pricer prints one material at a time.
         const PrintConfig &pc = print.config();
         const double area = M_PI * sqr(0.5 * pc.filament_diameter.get_at(0));
+#ifdef KZ_ROLES
+        { void kz_roles_probe(Slic3r::Print &); kz_roles_probe(print); }
+#endif
         const double volume = kz_extruded_volume(print) * pc.filament_flow_ratio.get_at(0);
         kz::lap("sum");
         *out_filament_mm = volume / area;
