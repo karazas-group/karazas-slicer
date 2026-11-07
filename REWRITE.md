@@ -520,6 +520,31 @@ Measured but not shipped, to pick up when the stage they live in is rewritten:
   every overlapping tree raw. Rejected for good.
 - Same, the second union before `smooth_outward`: within the limit (largest
   1.7e-4 g), speed change inside the noise (-6% to +4%). Not worth it.
+- Profile of the Clipper2 build (2026-11-07, `eval/laps.cjs`, 54 gate
+  cases, warm module; a lap is the step named before it):
+  - Supports off, per 27 cases: infill 2.56 s (33%), prepare_infill 1.52 s,
+    perimeters 1.28 s, STL load 0.81 s, slice 0.66 s, simplify 0.60 s.
+  - Supports on: the support step is 64% (17.1 s of 26.6 s).
+  - Inside infill, `FillConcentricInternal` (Orca's
+    `detect_narrow_internal_solid_infill`: thin solid strips get Arachne)
+    is 36% of all CPU on sphere40 and invcone, 21% on sphere-coarse, 7% on
+    Benchy. Each strip is one ring of ~290 points and its boost Voronoi
+    takes ~5 ms (native the same) because the ring is two parallel,
+    concentric polygons: every circle event fails the lazy filter and goes
+    to `extended_int<64>` exact arithmetic (gprof: `mul` 39%, `mp_circle_
+    formation_functor::pss` 15%). Exact way to speed it up: a faster
+    `extended_int` with the same chunk layout, so `p()`/`d()` and every
+    predicate come out the same. Turning the setting off is not an option
+    (the shop prints with it on).
+- Cold module: the first slice in a fresh module is ~40% slower than the
+  next ones (V8 runs wasm in its baseline compiler until code is hot;
+  sphere40 1.07 s cold vs 0.65 s warm in Node). The benches above reuse one
+  module, so they measure the warm case; a customer's first quote is cold.
+  Fixed on the website side (Karazas-website 49d285e, `orcaWarmup` in
+  src/entries/slicer.ts): when the customer reaches for the upload box, the
+  page slices an 8 mm generated sphere with supports and drops the result.
+  Chrome, dev pricer: first sphere40 slice 1.4 s -> 0.82 s. Tiered code is
+  shared by recycled workers, so later slices were already warm.
 - OrcaSlicer 2.5.0-alpha (Oct 2026), checked against our tree:
   - PR 16183 (simplify steps copied the whole PrintConfig per path): ported
     to the 2.4.2 patch, 54/54 bit-identical, 1-4% faster. simplify.cpp must
