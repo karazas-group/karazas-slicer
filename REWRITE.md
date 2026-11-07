@@ -565,9 +565,9 @@ colour/tool split stage in front of `slice`, used only when a 3MF with
 colours comes in; STL pricing doesn't load it. Until then everything above
 assumes one material.
 
-## 12. Clipper2 branch (this branch)
+## 12. Clipper2 (on main since 2026-10-31)
 
-This branch uses Clipper2 (OrcaSlicer PR 15969, Clipper 2.0.1) as the clipping
+main uses Clipper2 (OrcaSlicer PR 15969, Clipper 2.0.1) as the clipping
 module instead of Clipper1. `deps_src/clipper/` and `libslic3r/clipper.cpp`
 are gone; `ClipperUtils.cpp` wraps `deps_src/clipper2`, and `ClipperZUtils.cpp`
 is new. The port is `patches/clipper2.patch`, a diff on top of
@@ -577,6 +577,12 @@ Measured (2026-10-27, `eval/ab.cjs`, A = Clipper1 `leak` build, B = this
 build, 2 reps alternated per case): B/A = 0.767 (133.6 s -> 102.4 s over the
 54 cases). Per model: cup 0.54, hollowbox40 0.72, benchy 0.70, sphere40
 0.76, mushroom 0.85, invcone 0.89, cube20 0.94.
+
+Published 2026-11-07 (e921da0, built with `wasm/build.sh`): gate 54/54
+against `eval/golden-mm.txt`, heap 256 MB flat over 4 rounds, `eval/ab.cjs`
+against the Clipper1 dist/ build 0.779 (94.2 s -> 73.4 s; benchy 0.74, cup
+0.52, sphere40 0.75, cube20 0.94). The website's import (dev f18a635) shows
+the same grams within 0.01 g.
 
 Grams: `eval/gate.cjs --tol=1` passes, largest difference 0.0345 g (invcone,
 with supports). The results are no longer bit-identical to Clipper1, so the
