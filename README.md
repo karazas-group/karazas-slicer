@@ -203,25 +203,29 @@ open: preloading makes the first quote faster but costs 2 MB on limited data.
 - `eval/results/`: native Orca numbers, the wasm parity run, and the compile
   census.
 
-## Building (spike scripts)
+## Building
 
 The scripts expect everything under `$ORCA_WASM` (default `~/orca-wasm`) and
 write objects and output to `$OUT` (default `$ORCA_WASM/build`):
 
-- `orca/`: OrcaSlicer v2.4.2 with `patches/orca-2.4.2-wasm.patch` applied
-- `emsdk/`: Emscripten 6.0.13
-- `deps-src/`: Boost 1.84 (built to `bwasm/stage/lib`), oneTBB (`build-mt2`,
-  built with `-fwasm-exceptions`), qhull 8.0.2 (`bwasm2`, built with
-  `-sSUPPORT_LONGJMP=wasm`), Eigen 5.0.1, cereal, CGAL 5.6.3
-- `prefix-mt/include`: merged headers for the above
+```
+bash wasm/fetch.sh        # emsdk 6.0.13, Orca v2.4.2 + both patches, dep sources
+bash wasm/setup-deps.sh   # TBB, qhull, Boost, Boost.Log, libnoise, merged headers
+bash wasm/build.sh        # libslic3r, deps, archives, roots, link_web.sh
+```
 
-The dependency builds were done by hand and aren't scripted yet; REPORT.md §1
-has the flags that matter. Turning that into one reproducible build is step 2
-of the plan in §10.
+That gives `$OUT/out/web/kz-slicer.{js,wasm}`. `build.sh` lists the sources
+that failed to compile; it should be the 12 that need the libraries we cut
+(OCCT, NLopt, OpenVDB, OpenCV, freetype, CGAL's exact kernel). REPORT.md §1
+explains the dependency flags. Before publishing, run the gate (Benchy isn't
+in the repo, pass it with `BENCHY=`):
 
-Then: run `cc.sh` on every file in `libslic3r-sources.txt`, run `deps.sh`,
-pack the objects into `libslic3r_all.a` and `libdeps.a` with `emar`, compile
-the two driver files into `roots/`, and run `link_fixed.sh`. To test:
+```
+BENCHY=path/to/benchy.stl node eval/gate.cjs $OUT/out/web/kz-slicer.js   # 54/54 identical
+node eval/heap.cjs $OUT/out/web/kz-slicer.js 4                           # flat
+```
+
+The older native-style driver is still there. To test it:
 
 ```
 node $OUT/out/orca_fixed.js model.stl "machine.json;process.json;pla.json" out.gcode \

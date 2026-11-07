@@ -1,6 +1,6 @@
 // node eval/ab.cjs A.js B.js [reps]: same 54 gate cases, A and B alternated per case, prints totals and per-model ratio
 const fs = require('fs'), path = require('path');
-const M = '/home/user/kz-rewrite/eval/models/', P = '/home/user/kz-rewrite/eval/profiles/karaza.json';
+const M = __dirname + '/models/', P = __dirname + '/profiles/karaza.json';
 const CH = [[3, 40], [2, 15], [4, 80]];
 const ov = (w, i, s) => [['printable_area','0x0,1000x0,1000x1000,0x1000'],['printable_height',1000],['wall_loops',w],['sparse_infill_density',i+'%'],['enable_support',s],
   ...(s ? [['support_type','tree(auto)'],['support_style','organic'],['support_threshold_angle',35],['support_interface_top_layers',8],['support_interface_bottom_layers',8]] : [])].map(([k,v])=>`${k}\t${v}\n`).join('');
@@ -8,7 +8,7 @@ const ov = (w, i, s) => [['printable_area','0x0,1000x0,1000x1000,0x1000'],['prin
   const load = async (f) => { const F = require(path.resolve(f)); const m = await (F.default || F)({ print() {}, printErr() {} }); m.FS.mkdir('/p'); m.FS.writeFile('/p/k.json', fs.readFileSync(P)); return m; };
   const mods = [await load(process.argv[2]), await load(process.argv[3])];
   const reps = +process.argv[4] || 2, tot = [0, 0], per = {};
-  const models = fs.readdirSync(M).filter(f => f.endsWith('.stl')).map(f => M + f); models.push('/home/user/karaza-slicer/eval/models/benchy.stl');
+  const models = fs.readdirSync(M).filter(f => f.endsWith('.stl')).map(f => M + f); models.push(process.env.BENCHY || __dirname + '/models/benchy.stl');
   for (let r = 0; r < reps; r++) for (const mf of models) {
     const buf = fs.readFileSync(mf); const name = path.basename(mf, '.stl');
     for (const [w, i] of CH) for (const s of [0, 1]) {
