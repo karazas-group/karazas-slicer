@@ -13,6 +13,7 @@ if [ ! -d orca ]; then
   clone https://github.com/SoftFever/OrcaSlicer.git orca v2.4.2
   patch -p1 -s -d orca < $REPO/patches/orca-2.4.2-wasm.patch
   patch -p1 -s -d orca < $REPO/patches/clipper2.patch
+  patch -p1 -s -d orca < $REPO/patches/parallel-brim.patch
 fi
 
 cd deps-src
