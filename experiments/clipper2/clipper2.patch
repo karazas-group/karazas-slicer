@@ -5267,7 +5267,7 @@ diff -ruN a/deps_src/clipper2/Clipper2Lib/include/clipper2/clipper.engine.h b/de
  #include <functional>
  #include <memory>
  
-+// Orca: engine nodes are allocated through tbbmalloc, see clipper.engine.cpp.
++// kz: engine nodes are allocated through tbbmalloc, see clipper.engine.cpp.
 +#define CLIPPER2_NODE_ALLOCATOR \
 +	static void* operator new(size_t size); \
 +	static void operator delete(void* ptr) noexcept; \
@@ -5821,7 +5821,7 @@ diff -ruN a/deps_src/clipper2/Clipper2Lib/src/clipper.engine.cpp b/deps_src/clip
  namespace Clipper2Lib {
  #endif
  
-+  // Orca: tbbmalloc scales far better than the default heap when all slicing threads clip at once.
++  // kz: tbbmalloc scales far better than the default heap when all slicing threads clip at once.
 +  static void* NodeAlloc(size_t size)
 +  {
 +    if (void* p = scalable_malloc(size)) return p;
@@ -6306,7 +6306,7 @@ diff -ruN a/deps_src/clipper2/Clipper2Lib/src/clipper.offset.cpp b/deps_src/clip
      path_out.emplace_back(pt.x + offsetVec.x, pt.y + offsetVec.y);
  #endif
 -	int steps = static_cast<int>(std::ceil(steps_per_rad_ * std::abs(angle))); // #448, #456
-+	// Orca: round the step count like Clipper1 did, so round offsets keep their vertices.
++	// kz: round the step count like Clipper1 did, so round offsets keep their vertices.
 +	int steps = std::max(static_cast<int>(std::round(steps_per_rad_ * std::abs(angle))), 1);
  	for (int i = 1; i < steps; ++i) // ie 1 less than steps
  	{
@@ -6328,7 +6328,7 @@ diff -ruN a/deps_src/clipper2/Clipper2Lib/src/clipper.offset.cpp b/deps_src/clip
  		DoSquare(path, j, k);
  }
  
-+// Orca: join concave corners at the crossing of both edge offsets where safe, 3-point loops make dense inward offsets slow.
++// kz: join concave corners at the crossing of both edge offsets where safe, 3-point loops make dense inward offsets slow.
 +static bool OffsetConcaveCrossing(const Path64& path, const PathD& norms, size_t j, size_t k, size_t next,
 +	double delta, Path64& path_out)
 +{

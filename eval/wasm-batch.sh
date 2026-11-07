@@ -3,7 +3,7 @@
 HERE=$(cd "$(dirname "$0")" && pwd); P=$HERE/profiles; M=$HERE/models
 S=${S:-/tmp}  # w.gcode goes here; benchy.stl is read from $S/extra/ if it isn't in models/
 ORG="enable_support 1 support_type tree(auto) support_style organic support_threshold_angle 35"
-JS=${JS:-${ORCA_WASM:-$HOME/orca-wasm}/build/out/orca_fixed.js}
+JS=${JS:-${KZ_WASM:-$HOME/kz-wasm}/build/out/kz_fixed.js}
 for m in cube20 cup sphere40 invcone mushroom bracket benchy; do
   f=$M/$m.stl; [ -f $f ] || f=$S/extra/$m.stl
   for pr in p2s s1; do for sup in s0 org35; do

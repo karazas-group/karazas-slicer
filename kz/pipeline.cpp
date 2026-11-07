@@ -1,8 +1,8 @@
-// Stage: pipeline. Runs the Orca steps in order for one slice and reads the
+// Stage: pipeline. Runs the upstream steps in order for one slice and reads the
 // answer off the result. Owns the profile cache between slices.
 // Calls: load_stl (Format/STL.cpp), Print::apply, Print::process,
 // kz_extruded_volume (volume_sum.cpp). With -DKZ_GCODE also export_gcode, to
-// cross-check the sum against Orca's own G-code totals (link_check.sh).
+// cross-check the sum against the G-code totals (link_check.sh).
 #include "kz.hpp"
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Model.hpp"
@@ -34,7 +34,7 @@ static int load_profiles(const std::string &paths)
 {
     if (paths == g_profiles_key) return 0;
     DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
-    // paths: "machine.json;process.json;filament.json" (already-flattened Orca profiles)
+    // paths: "machine.json;process.json;filament.json" (already-flattened printer profiles)
     size_t pos = 0;
     while (pos <= paths.size()) {
         size_t e = paths.find(';', pos); if (e == std::string::npos) e = paths.size();
@@ -99,7 +99,7 @@ int kz::slice_one(const char *stl_path, const char *flat_config_path, const kz::
         *out_filament_g  = volume * pc.filament_density.get_at(0) * 0.001;
         *out_time_s      = 0;
 #ifdef KZ_GCODE
-        // Validation build: also export the G-code, and report Orca's own
+        // Validation build: also export the G-code, and report the G-code export's own
         // numbers alongside, so the sum can be checked against them.
         GCodeProcessorResult result;
         print.export_gcode(gcode_out, &result, nullptr);
@@ -110,7 +110,7 @@ int kz::slice_one(const char *stl_path, const char *flat_config_path, const kz::
 #endif
         return 0;
     } catch (const std::exception &e) {
-        std::fprintf(stderr, "orca_slice failed: %s\n", e.what());
+        std::fprintf(stderr, "kz_slice failed: %s\n", e.what());
         return -2;
     }
 }

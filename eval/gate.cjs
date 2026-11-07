@@ -23,7 +23,7 @@ const overrides = (walls, infill, sup) => [
   const write = process.argv.includes('--write');
   const tolArg = process.argv.find((a) => a.startsWith('--tol='));
   const tol = tolArg ? +tolArg.slice(6) : 0;
-  // Grams from mm the way Orca does: filament cross-section x density.
+  // Grams from mm the way the G-code export does: filament cross-section x density.
   const prof = JSON.parse(fs.readFileSync(E + 'profiles/karaza.json', 'utf8'));
   const first = (v) => +(Array.isArray(v) ? v[0] : v);
   const gPerMm = Math.PI * (first(prof.filament_diameter) / 2) ** 2 * first(prof.filament_density) / 1000;

@@ -1,4 +1,4 @@
-# Resolve an Orca system preset's "inherits" chain into one flat JSON the CLI can load.
+# Resolve a system preset's "inherits" chain into one flat JSON the CLI can load.
 # usage: flatten.py <profiles dir> <vendor> <type> <name> <out.json>
 import json, os, sys
 root, vendor, kind, name, out = sys.argv[1:6]

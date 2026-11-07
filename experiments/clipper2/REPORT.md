@@ -1,16 +1,16 @@
-# OrcaSlicer PR 15969 (Clipper2 2.0.1) in the wasm build of Orca 2.4.2
+# Upstream PR 15969 (Clipper2 2.0.1) in the wasm build of upstream 2.4.2
 
 Result: the port builds, links and runs the full 54-slice gate. Total slicing time falls by about **1.27x**
 (22% less time); plastic weight changes by a median 0.0002 g (0.001 %), at most 0.034 g (0.39 %), and only in a handful
 of support cases. Nothing was committed or pushed, and nothing outside `c2/` and `c2build/` was edited (the
-read-only tree `/home/user/orca-wasm/orca` and `/home/user/kz-rewrite` were only read).
+read-only tree `/home/user/kz-wasm/upstream` and `/home/user/kz-rewrite` were only read).
 
 ## 1. What was ported
 
-Source tree: `c2/orca/` (a copy of src/, deps_src/, tests/), diff in `c2/clipper2.patch` (72 files, src/ and deps_src/ only,
-12 k lines). The diff base is `git HEAD + patches/orca-2.4.2-wasm.patch`, kept as `c2/pure/`; see section 5 for why that base and not the live tree.
+Source tree: `c2/upstream/` (a copy of src/, deps_src/, tests/), diff in `c2/clipper2.patch` (72 files, src/ and deps_src/ only,
+12 k lines). The diff base is `git HEAD + patches/libslic3r-2.4.2.patch`, kept as `c2/pure/`; see section 5 for why that base and not the live tree.
 
-* The PR diff (`c2/pr/pr.diff`, 78 files) applied with `patch -p1`. Most hunks applied with small offsets; the whole of Clipper2 2.0.1 with Orca's tweaks
+* The PR diff (`c2/pr/pr.diff`, 78 files) applied with `patch -p1`. Most hunks applied with small offsets; the whole of Clipper2 2.0.1 with upstream's tweaks
   (engine, offset, rectclip, new triangulation, clipper2_z, core/export headers) came in unchanged. That includes everything you listed:
   offset joins at the edge-offset crossing for concave corners, the single PolyTree pass for booleans to ExPolygons,
   the Clipper1 semantics (collinear removal, miter limit >= 2, arc tolerance <= quarter offset, 0.005*|delta| input decimation),
@@ -26,7 +26,7 @@ Source tree: `c2/orca/` (a copy of src/, deps_src/, tests/), diff in `c2/clipper
   * `Algorithm/LineSplit.hpp` (`ClipperLib_Z::cInt` -> `coord_t`) and `ShortestPath.hpp` (removed the `ClipperLib::PolyNode` forward declaration): rejected hunks redone by hand.
   * `GCode.cpp` (not in the PR): one `ClipperLib::PointInPolygon(..) != 1` in the wipe tower travel code replaced by `!Slic3r::contains(bed_polygon, p, false)`. This has the same semantics because Clipper1 returned -1 on the boundary. (GCode.cpp is not on the pricing path.)
 * Left out: `PerimeterGenerator.cpp` 5 hunks (they touch `clip_inner_walls_over_top`, which 2.4.2 doesn't have); test hunks that rejected
-  (`test_fill.cpp`, `test_gcodewriter.cpp`: tests are not built here); `docs/HLSD/polygon-clipping.md` is in `c2/orca/docs` but not in the patch.
+  (`test_fill.cpp`, `test_gcodewriter.cpp`: tests are not built here); `docs/HLSD/polygon-clipping.md` is in `c2/upstream/docs` but not in the patch.
   The rejected hunks are in `c2/rej/`.
 
 ### tbbmalloc
@@ -37,7 +37,7 @@ CMake still links `TBB::tbbmalloc`, which our scripts don't use.
 
 ## 2. How it was built
 
-All of it with the repo's own scripts where possible (`ORCA_WASM=c2`, `OUT=c2build`), at most 2 compiles at a time:
+All of it with the repo's own scripts where possible (`KZ_WASM=c2`, `OUT=c2build`), at most 2 compiles at a time:
 
 1. `c2/c2deps.sh`: compiled the 5 Clipper2 sources (engine, offset, rectclip, triangulation, clipper2_z) in the way `deps.sh` does. New `libdeps.a` = baseline `libdeps.a` minus the Clipper1 objects (`clipper_clipper*.o`) and the old `c2_*.o`, plus the new ones.
 2. Which libslic3r objects to rebuild: `c2/deps_scan.sh` runs `em++ -MM` on all 208 sources and I compared the header sets with the changed files: **160 of 197 archived objects** include a changed header (nearly everything, through ClipperUtils.hpp/Polygon.hpp). `c2/build_affected.sh` rebuilt those 160 plus the new `ClipperZUtils.cpp` with `wasm/cc.sh` (~12 s per file, about 12 min wall). The rest of `libslic3r_all.a` is taken from the existing archive; `clipper.cpp.o` and `Clipper2Utils.cpp.o` were deleted from it.
@@ -142,7 +142,7 @@ Grams from filament mm (same factor as gate.cjs); ms are medians of the three in
 
 ## 5. Notes and caveats
 
-* **The live source tree changed under me.** `/home/user/orca-wasm/orca` is no longer the patch alone: while I worked, someone else's experiment left uncommitted edits in `Fill/FillBase.cpp`, `GCode/GCodeProcessor.cpp`, `Print.cpp` (+9 lines), `PrintObject.cpp`, `PrintObjectSlice.cpp`, `Support/TreeSupport.{cpp,hpp}` on top of `patches/orca-2.4.2-wasm.patch` (`git diff` there differs from the patch file). My copy (made earlier) matched the patch, and I double-checked by rebuilding the base from `git archive HEAD` plus the patch (`c2/pure`). `clipper2.patch` is `diff -ruN c2/pure/{src,deps_src} c2/orca/{src,deps_src}`, so it applies to HEAD + the official patch, not to the live tree as it is now. If you apply it there, FillBase.cpp and Print.cpp (PR hunks) may need a manual fix.
+* **The live source tree changed under me.** `/home/user/kz-wasm/upstream` is no longer the patch alone: while I worked, someone else's experiment left uncommitted edits in `Fill/FillBase.cpp`, `GCode/GCodeProcessor.cpp`, `Print.cpp` (+9 lines), `PrintObject.cpp`, `PrintObjectSlice.cpp`, `Support/TreeSupport.{cpp,hpp}` on top of `patches/libslic3r-2.4.2.patch` (`git diff` there differs from the patch file). My copy (made earlier) matched the patch, and I double-checked by rebuilding the base from `git archive HEAD` plus the patch (`c2/pure`). `clipper2.patch` is `diff -ruN c2/pure/{src,deps_src} c2/orca/{src,deps_src}`, so it applies to HEAD + the official patch, not to the live tree as it is now. If you apply it there, FillBase.cpp and Print.cpp (PR hunks) may need a manual fix.
 * The 160 objects were compiled with the same flags as the baseline (`cc.sh`, -O2). Link flags unchanged.
-* Not done: native Orca comparison, the unit tests of the PR, checking that the PR's behaviours (miter limit, decimation, etc.) are exercised.
-* Files: `c2/orca` (ported tree), `c2/pure` (base), `c2/pr/pr.diff`, `c2/rej/` (rejected hunks), `c2/runs/*.json`, `c2/table.md`, `c2/sup/`, build dir `c2build/` (archives `libslic3r_all.a`, `libdeps.a`, `out/cfg/kz-slicer.js`).
+* Not done: native upstream comparison, the unit tests of the PR, checking that the PR's behaviours (miter limit, decimation, etc.) are exercised.
+* Files: `c2/upstream` (ported tree), `c2/pure` (base), `c2/pr/pr.diff`, `c2/rej/` (rejected hunks), `c2/runs/*.json`, `c2/table.md`, `c2/sup/`, build dir `c2build/` (archives `libslic3r_all.a`, `libdeps.a`, `out/cfg/kz-slicer.js`).

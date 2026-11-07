@@ -1,7 +1,7 @@
 // node eval/gcode.cjs <kz-slicer.js from link_check.sh> <model.stl> <out.gcode> [walls infill supports]
 // Slices one model with the validation build (G-code export linked back in)
 // using the pricer's settings file and overrides, and writes the G-code, so
-// eval/supports_view.py can draw it next to native Orca's.
+// eval/supports_view.py can draw it next to the native build's.
 const fs = require('fs'), path = require('path');
 const [js, model, out, walls = 3, infill = 40, sup = 1] = process.argv.slice(2);
 const ov = [['printable_area', '0x0,1000x0,1000x1000,0x1000'], ['printable_height', 1000], ['wall_loops', walls],

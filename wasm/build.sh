@@ -5,7 +5,7 @@
 # (OCCT, NLopt, OpenVDB, OpenCV, freetype, CGAL's exact kernel) fail to compile
 # and are left out; the list of failures is printed and should be exactly
 # those 12. Logs: $OUT/logs.
-W=${ORCA_WASM:-$HOME/orca-wasm}; HERE=$(cd "$(dirname "$0")" && pwd); OUT=${OUT:-$W/build}
+W=${KZ_WASM:-$HOME/kz-wasm}; HERE=$(cd "$(dirname "$0")" && pwd); OUT=${OUT:-$W/build}
 source $W/emsdk/emsdk_env.sh >/dev/null 2>&1
 mkdir -p $OUT; rm -f $OUT/obj/*.o
 { grep -v -E '^(clipper\.cpp|Clipper2Utils\.cpp)$' $HERE/libslic3r-sources.txt; echo ClipperZUtils.cpp; } | sort -u |

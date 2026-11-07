@@ -1,8 +1,8 @@
 #ifndef __SLIC3R_VERSION_H
 #define __SLIC3R_VERSION_H
 
-#define SLIC3R_APP_NAME "OrcaSlicer"
-#define SLIC3R_APP_KEY "OrcaSlicer"
+#define SLIC3R_APP_NAME "Karaza"
+#define SLIC3R_APP_KEY "Karaza"
 #define SLIC3R_VERSION "2.4.2"
 #define SoftFever_VERSION "2.4.2"
 #ifndef GIT_COMMIT_HASH

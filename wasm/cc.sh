@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-W=${ORCA_WASM:-$HOME/orca-wasm}; HERE=$(cd "$(dirname "$0")" && pwd); OUT=${OUT:-$W/build}
+W=${KZ_WASM:-$HOME/kz-wasm}; HERE=$(cd "$(dirname "$0")" && pwd); OUT=${OUT:-$W/build}
 # usage: cc.sh <src relative to libslic3r> [extra flags]
 source $W/emsdk/emsdk_env.sh >/dev/null 2>&1
-O=$W/orca; D=$O/deps_src; P=$W/prefix-mt; S=$W/deps-src
+O=$W/upstream; D=$O/deps_src; P=$W/prefix-mt; S=$W/deps-src
 src=$1; shift
 out=$OUT/obj/${OBJ:-$(echo $src | tr '/' '_')}.o
 mkdir -p $OUT/obj $OUT/logs

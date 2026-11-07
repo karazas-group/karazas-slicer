@@ -1,4 +1,4 @@
-# Slice one model with the OrcaSlicer CLI and print grams / time.
+# Slice one model with the native upstream CLI and print grams / time.
 # usage: run.py <printer p2s|s1> <model.stl> <tag> [key=value ...]   (overrides go into the process profile)
 import json, os, subprocess, sys, zipfile, re, time, shutil
 here = os.path.dirname(os.path.abspath(__file__))

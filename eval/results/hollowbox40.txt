@@ -1,6 +1,6 @@
 # hollowbox40 after the admesh binary-detection fix (Oct 21, 2026).
-# Native Orca 2.4.2 can't load the binary file either, so it got an ASCII
-# copy with the same vertices. wasm = validation build (Orca's G-code total)
+# The native 2.4.2 build can't load the binary file either, so it got an ASCII
+# copy with the same vertices. wasm = validation build (the G-code total)
 # and pricing build (summed toolpaths; S1 excludes its start G-code purge line).
 case        native  wasm-gcode  wasm-pricer
 p2s-s0      19.27   19.275      19.28

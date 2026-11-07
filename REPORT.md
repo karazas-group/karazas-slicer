@@ -1,18 +1,18 @@
-# OrcaSlicer libslic3r to WebAssembly: feasibility spike
+# Upstream libslic3r to WebAssembly: feasibility spike
 
 Date: 2026-10-19
-Orca version: **v2.4.2**, commit `8500fcdccaa10b5099ac20d252af3a7c560046f1` (2026-07-06), shallow clone at `/home/user/orca-wasm/orca`
-Toolchain: Emscripten 6.0.13 (emsdk at `/home/user/orca-wasm/emsdk`), Node 22.22 as the test host
-All work is in `/home/user/orca-wasm` (outside any repo). Nothing was committed or pushed.
+Upstream version: **v2.4.2**, commit `8500fcdccaa10b5099ac20d252af3a7c560046f1` (2026-07-06), shallow clone at `/home/user/kz-wasm/upstream`
+Toolchain: Emscripten 6.0.13 (emsdk at `/home/user/kz-wasm/emsdk`), Node 22.22 as the test host
+All work is in `/home/user/kz-wasm` (outside any repo). Nothing was committed or pushed.
 
 ---
 
 ## 0. Verdict
 
-**Feasible. A wasm build was produced and it matches native output.** The probe links unmodified Orca 2.4.2 libslic3r plus a 70-line driver into one `.wasm`. It loads the flattened P2S and Ender-3 S1 profiles, slices with walls, top/bottom, sparse infill and organic tree supports at 35°, writes G-code, and runs GCodeProcessor.
+**Feasible. A wasm build was produced and it matches native output.** The probe links unmodified upstream 2.4.2 libslic3r plus a 70-line driver into one `.wasm`. It loads the flattened P2S and Ender-3 S1 profiles, slices with walls, top/bottom, sparse infill and organic tree supports at 35°, writes G-code, and runs GCodeProcessor.
 
-- **Accuracy:** all 28 reference cases slice. On 24, grams are **identical** to the native OrcaSlicer 2.4.2 CLI; three differ by 0.01 g and one (Benchy, S1, organic) by 0.15 g (0.7%). Filament mm agrees within ±0.05%. Model print time agrees within 11 s on the cases where native reports it.
-- **Fixed Oct 20:** `sphere40` and `benchy` used to crash in Arachne with "memory access out of bounds". It was a 32-bit `size_t` bug in Orca's own code. See §8.
+- **Accuracy:** all 28 reference cases slice. On 24, grams are **identical** to the native 2.4.2 CLI; three differ by 0.01 g and one (Benchy, S1, organic) by 0.15 g (0.7%). Filament mm agrees within ±0.05%. Model print time agrees within 11 s on the cases where native reports it.
+- **Fixed Oct 20:** `sphere40` and `benchy` used to crash in Arachne with "memory access out of bounds". It was a 32-bit `size_t` bug in upstream's own code. See §8.
 - **Still open:** wasm wall time is about 2 s minimum, and about 3.5-4.5x native for organic-support jobs.
 - **Size:** 8.4 MB raw, **2.66 MB gzip**, before any trimming.
 - **Effort:** about **3-5 engineer-weeks** to reach a production-quality minimal port (§10).
@@ -24,13 +24,13 @@ All work is in `/home/user/orca-wasm` (outside any repo). Nothing was committed 
 
 The table covers what `src/libslic3r/CMakeLists.txt` links (lines ~580-620), plus root `CMakeLists.txt:584` for the Boost components and the `deps/` versions.
 
-| Dependency (Orca deps ver.) | Used by (libslic3r) | Needed for slice+support+estimate? | Emscripten status | Decision | Notes from this spike |
+| Dependency (upstream deps ver.) | Used by (libslic3r) | Needed for slice+support+estimate? | Emscripten status | Decision | Notes from this spike |
 |---|---|---|---|---|---|
 | **Boost 1.84** headers | everywhere (polygon/voronoi, spirit, format, algorithm…) | yes | header-only works | **KEEP** | `deps-src/boost-1.84.0` |
 | Boost.filesystem / thread / nowide / locale / date_time / chrono / atomic / container | Utils, Config, Thread, LocalesUtils, PlaceholderParser | yes (small) | built with b2/CMake + emcmake; OK | **KEEP** | `bwasm/stage/lib`. Boost's CMake build fails on `boost_context` i386 `.S`, so build with `ninja -k 0` or select components |
 | Boost.Log | ~80 files (`BOOST_LOG_TRIVIAL`) | no (logging only) | compiles by hand (30 TUs, `-DBOOST_LOG_WITHOUT_{SYSLOG,IPC,EVENT_LOG,DEBUG_OUTPUT} -DBOOST_LOG_USE_STD_REGEX`) | **KEEP now, STUB later** | A header shim (`BOOST_LOG_TRIVIAL(x)` mapped to a null stream) saves about 300-500 KB. three-slicer does this |
 | Boost.regex / iostreams / program_options / log_setup | GUI/CLI side | no | – | **CUT** | not referenced by reachable objects |
-| **oneTBB** (Orca: 2021.5) | parallel_for ×136, parallel_pipeline ×8 (GCode export), concurrent_vector, spin_mutex, task_group, enumerable_thread_specific, task_arena, global_control | yes | **oneTBB master supports emscripten** (af14bb5 used). Builds with `-pthread -fwasm-exceptions` | **KEEP** (MT) or serial build (ST) | Must be built with the same EH model (`-fwasm-exceptions`), otherwise `__resumeException` is undefined at link |
+| **oneTBB** (upstream: 2021.5) | parallel_for ×136, parallel_pipeline ×8 (GCode export), concurrent_vector, spin_mutex, task_group, enumerable_thread_specific, task_arena, global_control | yes | **oneTBB master supports emscripten** (af14bb5 used). Builds with `-pthread -fwasm-exceptions` | **KEEP** (MT) or serial build (ST) | Must be built with the same EH model (`-fwasm-exceptions`), otherwise `__resumeException` is undefined at link |
 | tbbmalloc (`scalable_allocator`) | Point.hpp, clipper.hpp, SupportLayer.hpp | no | – | **STUB** | `probe/driver/wasm_shims.cpp` forwards `scalable_*` to malloc. Consider `-sMALLOC=mimalloc` |
 | **CGAL 5.6.3** (header-only) | `Geometry/VoronoiUtilsCgal.cpp` (Epeck, planarity check used by Arachne and MedialAxis), Triangulation, CutSurface, MeshBoolean | **yes**, Voronoi validation in Arachne | header-only works with `-DCGAL_DISABLE_GMP=1 -DCGAL_DISABLE_ROUNDING_MATH_CHECK` | **KEEP (headers), no GMP/MPFR** | MeshBoolean.cpp needs `Epeck_with_sqrt` (LEDA/CORE), which is cut and not reachable |
 | GMP / MPFR | CGAL exact kernels | no (CGAL falls back to MP_Float) | ports exist but are unnecessary | **CUT** | |
@@ -61,7 +61,7 @@ The table covers what `src/libslic3r/CMakeLists.txt` links (lines ~580-620), plu
 
 ## 2. Reachable code, and what can be cut
 
-The spike built a driver (`/home/user/orca-wasm/probe/driver/wasm_driver.cpp`) that calls the real pipeline:
+The spike built a driver (`/home/user/kz-wasm/probe/driver/wasm_driver.cpp`) that calls the real pipeline:
 `load_stl → Print::apply → validate → Print::process() → Print::export_gcode(path, &GCodeProcessorResult) → print_statistics()`.
 
 Object-level reachability came from `probe/reach.py`, which runs llvm-nm over all compiled objects and mimics static-lib pulling. Output is in `probe/reach.txt`.
@@ -88,12 +88,12 @@ Subsystem sizes (lines): Support 18.6k, GCode 29.3k, Fill 15.3k, Format 18.2k, A
 
 | Project | What it is | Maturity | What they cut |
 |---|---|---|---|
-| **three-slicer** (npm `three-slicer` 0.3.5, 2026-10-16; GitHub `kimgh06/Three_Slicer`, inspected at 917b79d, cloned to `/home/user/orca-wasm/ext/ts-src`) | Custom wasm kernel that **compiles verbatim Orca TUs** (Arachne, Fill/*, TreeSupport3D/organic, FillLightning, Config/PrintConfig, GCodeProcessor, WipeTower, PlaceholderParser, CoolingBuffer) behind its own driver (`params.cpp`, 159 wired params). It also includes the PrusaSlicer 2.9.6 SLA chain | About 2 months old, single author, AGPL. ST build (SINGLE_FILE) and MT build (pthreads, pool = hardwareConcurrency, 4 GB max, 2 MB stacks). MT wasm is 6.0 MB / 1.9 MB gzip | Stubs tbb (serial), boost/log, boost/thread, nowide, filesystem, cereal. Uses `CGAL_DISABLE_GMP`, `-fwasm-exceptions`, `-O2` (-O3 gave +0.7% speed for +9% size; `-flto` crashes wasm-ld). **Own driver, not `Print::process`**. Not all keys are wired, no `;TYPE:` comments, and its docs report about 25% time-estimate drift between its ST and MT kernels |
+| **three-slicer** (npm `three-slicer` 0.3.5, 2026-10-16; GitHub `kimgh06/Three_Slicer`, inspected at 917b79d, cloned to `/home/user/kz-wasm/ext/ts-src`) | Custom wasm kernel that **compiles verbatim upstream TUs** (Arachne, Fill/*, TreeSupport3D/organic, FillLightning, Config/PrintConfig, GCodeProcessor, WipeTower, PlaceholderParser, CoolingBuffer) behind its own driver (`params.cpp`, 159 wired params). It also includes the PrusaSlicer 2.9.6 SLA chain | About 2 months old, single author, AGPL. ST build (SINGLE_FILE) and MT build (pthreads, pool = hardwareConcurrency, 4 GB max, 2 MB stacks). MT wasm is 6.0 MB / 1.9 MB gzip | Stubs tbb (serial), boost/log, boost/thread, nowide, filesystem, cereal. Uses `CGAL_DISABLE_GMP`, `-fwasm-exceptions`, `-O2` (-O3 gave +0.7% speed for +9% size; `-flto` crashes wasm-ld). **Own driver, not `Print::process`**. Not all keys are wired, no `;TYPE:` comments, and its docs report about 25% time-estimate drift between its ST and MT kernels |
 | **cura-wasm** (CuraEngine 4.6) | Emscripten build of CuraEngine | About 4 years stale | No OpenMP. 2.3 s native vs 6.6 s browser on their benchmark (about 2.9x) |
-| SimplyPrint, Kiri:Moto | SimplyPrint runs Orca **server-side**. Kiri:Moto is a native-JS slicer | – | – |
+| SimplyPrint, Kiri:Moto | SimplyPrint runs the upstream slicer **server-side**. Kiri:Moto is a native-JS slicer | – | – |
 | PrusaSlicer/libslic3r wasm | **No public port found** | – | – |
 
-**Conclusion:** the approach in this spike, running the real `Print::process()` and `GCode::do_export`, is closer to native parity than three-slicer. This spike reproduces Orca's grams exactly because it uses Orca's own config resolution and G-code pipeline. three-slicer is useful as a source of build tricks (stub set, flags) but not as a base.
+**Conclusion:** the approach in this spike, running the real `Print::process()` and `GCode::do_export`, is closer to native parity than three-slicer. This spike reproduces upstream's grams exactly because it uses upstream's own config resolution and G-code pipeline. three-slicer is useful as a source of build tricks (stub set, flags) but not as a base.
 
 ---
 
@@ -120,7 +120,7 @@ All 208 libslic3r TUs were compiled with em++ (`probe/cc.sh`, flags below). Resu
 
 ### 4.2 Source patches needed
 
-`cd /home/user/orca-wasm/orca && git diff` shows them all (24 lines):
+`cd /home/user/kz-wasm/upstream && git diff` shows them all (24 lines):
 
 1. **`src/libslic3r/Model.hpp`**: `#include "Format/STEP.hpp"` is wrapped in `#ifndef SLIC3R_NO_STEP`, with forward declarations of `Step`, `ImportStepProgressFn` and `StepIsUtf8Fn` in the `#else`. Model.hpp otherwise drags OCCT into every TU.
 2. **`src/libslic3r/Model.cpp`**: the body of `Model::read_from_step` is put under `#ifdef SLIC3R_NO_STEP throw RuntimeError(...)`.
@@ -156,13 +156,13 @@ Link errors hit on the way, all fixed:
 - `pthread_setname_np`: missing from emscripten libc. Shimmed.
 - `-Wl,-error-limit=0` is mis-parsed; use `-Wl,--error-limit=0`.
 
-**Output:** `probe/out/orca_probe.wasm` is **8,417,750 bytes, 2,663,233 bytes gzip -9**. The JS glue is 98 KB.
+**Output:** `probe/out/kz_probe.wasm` is **8,417,750 bytes, 2,663,233 bytes gzip -9**. The JS glue is 98 KB.
 
-### 4.5 Run results vs native OrcaSlicer 2.4.2 CLI
+### 4.5 Run results vs native 2.4.2 CLI
 
-Native reference: `/home/user/slicer-eval/orca/orca-results.txt`. wasm results: `probe/run/batch.txt`, G-code in `probe/run/*.gcode`.
+Native reference: `/home/user/slicer-eval/native/native-results.txt`. wasm results: `probe/run/batch.txt`, G-code in `probe/run/*.gcode`.
 
-- Profiles: the same flattened JSONs from `/home/user/slicer-eval/orca/profiles/{p2s,s1}-{machine,process,pla}.json`.
+- Profiles: the same flattened JSONs from `/home/user/slicer-eval/native/profiles/{p2s,s1}-{machine,process,pla}.json`.
 - `org35` means `enable_support=1 support_type=tree(auto) support_style=organic support_threshold_angle=35`.
 - "time" is the `model printing time` header, which is the same field `run.py` reports.
 - wasm ran in Node 22 with 4 TBB threads (PTHREAD_POOL_SIZE=4) on a 4-core container.
@@ -198,22 +198,22 @@ Native reference: `/home/user/slicer-eval/orca/orca-results.txt`. wasm results: 
 | benchy | s1-s0 | 12.58 | 12.59 | | 4222.5 | | | | | 14.6 |
 | benchy | s1-org35 | 20.31 | 20.46 | | 6861.5 | | | | | 28.0 |
 
-The sphere40 and benchy rows are from the run after the Arachne fix (`results/wasm-parity.txt`); native mm for benchy is in `results/orca-native.txt`.
+The sphere40 and benchy rows are from the run after the Arachne fix (`results/wasm-parity.txt`); native mm for benchy is in `results/native-2.4.2.txt`.
 
 \* Native ms comes from run.py and includes AppImage start and 3MF export.
 \** wasm wall time includes Node start, compiling 8.4 MB of wasm, and `full_print_config()`. That fixed floor is about 1.7-2 s.
 
 Notes on the results:
 - **Grams match exactly on 24 of 28.** sphere40 with organic supports and benchy S1 without supports differ by 0.01 g; benchy S1 organic by 0.15 g. The wasm build gives the same numbers on every run, so this is either native varying between runs (organic supports run in parallel) or a small real difference. Re-run native to tell which.
-- The orca-results.txt S1 rows have no time because the run.py regex found no time for S1, so there is nothing to compare. The wasm S1 header times look plausible.
-- `orca_slice()` currently returns `modes[Normal].time`, which is the **total** estimated time. For the P2S that includes about 9.5 min of start-G-code prep (`cube20`: model 20m59s, total 30m33s). The shop must pick one number deliberately. `run.py` reports the "model printing time".
+- The native-results.txt S1 rows have no time because the run.py regex found no time for S1, so there is nothing to compare. The wasm S1 header times look plausible.
+- `kz_slice()` currently returns `modes[Normal].time`, which is the **total** estimated time. For the P2S that includes about 9.5 min of start-G-code prep (`cube20`: model 20m59s, total 30m33s). The shop must pick one number deliberately. `run.py` reports the "model printing time".
 - Harmless P2S log line: `update_values_to_printer_extruders_for_multiple_filaments: option filament_retract_lift_enforce not found`.
 
 ---
 
 ## 5. Build approach (recommended for the real port)
 
-1. **Toolchain:** `emcmake cmake` with a dedicated `cmake/wasm/` superbuild. Do not reuse Orca's `deps/` superbuild, which builds OCCT, OpenCV, OpenVDB and others.
+1. **Toolchain:** `emcmake cmake` with a dedicated `cmake/wasm/` superbuild. Do not reuse upstream's `deps/` superbuild, which builds OCCT, OpenCV, OpenVDB and others.
    - Compile flags: `-std=c++17 -O2 -pthread -fwasm-exceptions` (C: `-sSUPPORT_LONGJMP=wasm`).
    - Defines: `-DNDEBUG -DUSE_TBB -DTBB_USE_CAPTURED_EXCEPTION=0 -DBOOST_ALL_NO_LIB -DSLIC3R_NO_STEP -DSLIC3R_NO_JPEG -DCGAL_DISABLE_GMP=1 -DCGAL_DISABLE_ROUNDING_MATH_CHECK`.
    - **Every object, including TBB, qhull and Boost, must use the same EH and longjmp model.**
@@ -232,12 +232,12 @@ Notes on the results:
    -sSTACK_SIZE=4MB -sDEFAULT_PTHREAD_STACK_SIZE=4MB
    -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency -sPROXY_TO_PTHREAD (or run in a Web Worker)
    -sMODULARIZE -sEXPORT_ES6 -sENVIRONMENT=web,worker
-   -sEXPORTED_FUNCTIONS=[_orca_slice,...]  (or embind)
+   -sEXPORTED_FUNCTIONS=[_kz_slice,...]  (or embind)
    --closure 1  (JS glue)
    ```
    Drop `-sNODERAWFS`, which is for test use only. Use MEMFS and pass the STL bytes in.
 5. **API:**
-   - `orca_slice(stl_bytes, printer_id, filament_id, overrides_json)` returns `{grams, mm, model_time_s, total_time_s, needs_support}`.
+   - `kz_slice(stl_bytes, printer_id, filament_id, overrides_json)` returns `{grams, mm, model_time_s, total_time_s, needs_support}`.
    - Write G-code to MEMFS, or to `/dev/null` with GCodeProcessor fed in-process. The G-code text is not needed, and skipping it saves memory.
    - Ship the 4 flattened profile JSONs (P2S + S1 × PLA + PETG, plus the 0.20mm process) as static assets. They are about 10-20 KB each.
 
@@ -267,10 +267,10 @@ Notes on the results:
   - Option 2: a 100-line serial TBB shim (three-slicer's approach).
   - No COOP/COEP needed, simpler hosting, smaller glue.
 
-**Update Oct 20:** mimalloc (`-sMALLOC=mimalloc`) took the matrix from 240 s to 138 s, organic supports 2-3.5x faster, same grams on all 28. -O3 with -msimd128 made it slower overall (146 s) and bigger, so it stays -O2. A warm slice in a loaded module (cube20) is about 150 ms. Results: `eval/results/wasm-mimalloc.txt`. Native Orca re-run three times on Benchy S1 organic gives 20.31 g every time, so the wasm's 20.46 g is a real difference, probably libm rounding amplified by organic supports; not chased yet.
+**Update Oct 20:** mimalloc (`-sMALLOC=mimalloc`) took the matrix from 240 s to 138 s, organic supports 2-3.5x faster, same grams on all 28. -O3 with -msimd128 made it slower overall (146 s) and bigger, so it stays -O2. A warm slice in a loaded module (cube20) is about 150 ms. Results: `eval/results/wasm-mimalloc.txt`. Native upstream re-run three times on Benchy S1 organic gives 20.31 g every time, so the wasm's 20.46 g is a real difference, probably libm rounding amplified by organic supports; not chased yet.
 
 **Speed (measured and estimated):**
-- Measured, 4-thread wasm in Node vs native Orca on the same 4-core box:
+- Measured, 4-thread wasm in Node vs native upstream on the same 4-core box:
   - Light jobs: about 2.1-2.6 s, dominated by about 1.7-2 s of fixed start-up. In a browser with a cached, pre-compiled module (`WebAssembly.compileStreaming` plus keeping the worker alive), the fixed cost is paid once per page view, not per quote.
   - Organic-support jobs: **3.4-4.3x native** (invcone 20.9 s vs 5.8 s; mushroom 10.4 s vs 3.1 s).
   - cup: 1.3-2.2x.
@@ -299,14 +299,14 @@ Notes on the results:
 
 1. **Arachne memory access out of bounds. Fixed Oct 20.**
    - Cause: `SkeletalTrapezoidation::interpolate` (inlined into `propagateBeadingsDownward`) runs `for (next_inset_idx = left.toolpath_locations.size() - 1; next_inset_idx >= 0; ...)` with a 64-bit signed `coord_t`. With an empty vector, `size() - 1` is 2^32-1 on wasm32 (32-bit `size_t`), not -1, so the loop reads index 4294967295. On 64-bit native it wraps to -1 and the loop never runs.
-   - Fix: `coord_t(left.toolpath_locations.size()) - 1`, now in `patches/orca-2.4.2-wasm.patch`. A grep of libslic3r for the same pattern (`size() - 1` into a loop counter tested `>= 0`) found no other case.
+   - Fix: `coord_t(left.toolpath_locations.size()) - 1`, now in `patches/libslic3r-2.4.2.patch`. A grep of libslic3r for the same pattern (`size() - 1` into a loop counter tested `>= 0`) found no other case.
    - The notes below are what was known before the fix.
    - Trace: `SkeletalTrapezoidation::propagateBeadingsDownward` ← `generateSegments` ← `WallToolPaths::generate` ← `FillConcentricInternal::fill_surface_extrusion` ← `Layer::make_fills` ← `PrintObject::infill()` (tbb parallel_for), on a TBB worker.
    - It persists with 4 MB TBB stacks, with `wall_generator=classic` (FillConcentricInternal still uses Arachne), and with fixed 1.5 GB memory and no growth. So it is not stack overflow or memory growth.
    - Likely another wasm32-only UB in the same family as `Print::m_origin`: an uninitialised member, a 32-bit `size_t`/`long` overflow, or OOB indexing that is benign on native 64-bit.
    - Next steps:
      - Build with `-fsanitize=address` (emscripten ASan) or `-sSAFE_HEAP=1`.
-     - Build native libslic3r with `-m32` or ASan/UBSan to see whether it is a latent Orca bug.
+     - Build native libslic3r with `-m32` or ASan/UBSan to see whether it is a latent upstream bug.
    - Estimate 1-5 days. **This is the main technical risk.**
 2. **wasm32 type-width bugs.**
    - `size_t`/`long` are 32-bit. One compile-time instance has been seen (GCode.hpp), plus the coordinate/origin runtime bug.
@@ -314,11 +314,11 @@ Notes on the results:
    - Mitigation: a broad corpus regression against native (see §9).
 3. **Config parity for P2S.**
    - P2S uses extruder variants ("Direct Drive Standard / High Flow"), resolved by `update_values_to_printer_extruders` (`src/libslic3r/PresetBundle.cpp:116-149`, `src/OrcaSlicer.cpp`).
-   - The flattened JSONs already resolve this, and grams match. Profiles must be **re-flattened** from the same Orca version whenever Orca is upgraded. Do not load the raw inherits chain in the browser.
+   - The flattened JSONs already resolve this, and grams match. Profiles must be **re-flattened** from the same upstream version whenever upstream is upgraded. Do not load the raw inherits chain in the browser.
 4. **COOP/COEP collateral** on the pricing page's third-party embeds (§6).
 5. **TBB on emscripten** is supported upstream but lightly used. There is a deadlock risk if TBB concurrency exceeds the pthread pool (observed). Keep the cap.
 6. **Organic support speed:** 10-25 s in wasm for moderately sized parts. Use progress UI and cancellation (`Print::cancel()` / `throw_if_canceled` already exist) and debounce re-slicing.
-7. **Upstream drift:** Orca moves fast. Keep the patch set small and `#ifdef`-only, and pin to a tag.
+7. **Upstream drift:** upstream moves fast. Keep the patch set small and `#ifdef`-only, and pin to a tag.
 8. **Exceptions:** wasm EH needs Safari 15.2+. Older browsers fall back to "quote unavailable".
 
 ---
@@ -327,13 +327,13 @@ Notes on the results:
 
 Goal: same profiles produce the same grams.
 
-- **Reference generator.** Use the native Orca 2.4.2 CLI at `/home/user/slicer-eval/orca/app/AppRun` via:
+- **Reference generator.** Use the native upstream 2.4.2 CLI at `/home/user/slicer-eval/native/app/AppRun` via:
   ```
-  xvfb-run -a python3 /home/user/slicer-eval/orca/run.py {p2s|s1} model.stl tag [k=v...]
+  xvfb-run -a python3 /home/user/slicer-eval/native/run.py {p2s|s1} model.stl tag [k=v...]
   ```
-  It writes `orca-results.txt` lines `{grams, mm, time}`.
-- **Same inputs.** The wasm side loads the **identical flattened JSONs** (`/home/user/slicer-eval/orca/profiles/{p2s,s1}-{machine,process,pla}.json`, plus PETG files to be added) in the same order (machine, process, filament) and applies the same `k=v` overrides.
-  - The probe's driver takes them as `node orca_probe.js model.stl "m.json;p.json;f.json" out.gcode key value ...`.
+  It writes `native-results.txt` lines `{grams, mm, time}`.
+- **Same inputs.** The wasm side loads the **identical flattened JSONs** (`/home/user/slicer-eval/native/profiles/{p2s,s1}-{machine,process,pla}.json`, plus PETG files to be added) in the same order (machine, process, filament) and applies the same `k=v` overrides.
+  - The probe's driver takes them as `node kz_probe.js model.stl "m.json;p.json;f.json" out.gcode key value ...`.
 - **Matrix.**
   - Models: cube20, cup, sphere40, invcone, mushroom, bracket, benchy, hollowbox40, plus 20-50 real customer STLs.
   - Printers and filaments: {P2S, Ender-3 S1} × {PLA, PETG}.
@@ -345,7 +345,7 @@ Goal: same profiles produce the same grams.
   - For a deeper check, also diff layer count and per-`;TYPE:` extruded length (support vs. walls vs. infill) from the G-code. The probe matches the native G-code line count to 0.3%.
   - The spike reached exact grams and 0.05% mm on 20/20 completed cases.
 - **Automation.** A CI job runs the native CLI once to produce goldens. The wasm build runs under Node (same `.wasm` the browser loads, with a Node-only `NODERAWFS` test harness or MEMFS) and fails on any deviation. Add a Playwright smoke test in Chrome, Firefox and Safari/WebKit for the COOP/COEP plus worker path.
-- **Version lock.** Pin to v2.4.2 and the same flattened profiles. When upgrading Orca, upgrade both sides and regenerate goldens.
+- **Version lock.** Pin to v2.4.2 and the same flattened profiles. When upgrading upstream, upgrade both sides and regenerate goldens.
 
 ---
 
@@ -367,10 +367,10 @@ Goal: same profiles produce the same grams.
 
 ## 11. Files and artefacts from this spike
 
-- Orca clone (v2.4.2, patched): `/home/user/orca-wasm/orca` (`git diff` = the 6 patches)
-- emsdk 6.0.13: `/home/user/orca-wasm/emsdk`
-- Dependency sources and builds: `/home/user/orca-wasm/deps-src/{boost-1.84.0 (bwasm/stage/lib), onetbb (build-mt2), qhull (bwasm2), eigen-5.0.1, cereal, CGAL-5.6.3, libnoise, zlib, libpng}`; merged headers in `/home/user/orca-wasm/prefix-mt/include`
-- Probe: `/home/user/orca-wasm/probe/`
+- Upstream clone (v2.4.2, patched): `/home/user/kz-wasm/upstream` (`git diff` = the 6 patches)
+- emsdk 6.0.13: `/home/user/kz-wasm/emsdk`
+- Dependency sources and builds: `/home/user/kz-wasm/deps-src/{boost-1.84.0 (bwasm/stage/lib), onetbb (build-mt2), qhull (bwasm2), eigen-5.0.1, cereal, CGAL-5.6.3, libnoise, zlib, libpng}`; merged headers in `/home/user/kz-wasm/prefix-mt/include`
+- Probe: `/home/user/kz-wasm/probe/`
   - `cc.sh`: per-TU compile, with flags
   - `deps.sh`: deps_src libs
   - `link.sh`: link (`link_dbg.sh` adds `--profiling-funcs`)
@@ -378,6 +378,6 @@ Goal: same profiles produce the same grams.
   - `stubs/openssl/md5.h`, `gen/libslic3r_version.h`
   - `reach.py`, `reach.txt`: reachability
   - `results*.txt`, `logs/`: TU census
-  - `out/orca_probe.{js,wasm}`
+  - `out/kz_probe.{js,wasm}`
   - `run/batch.txt`, `run/*.gcode`: parity runs
-- three-slicer, for reference: `/home/user/orca-wasm/ext/ts-src`, `/home/user/orca-wasm/ext/three-slicer/package`
+- three-slicer, for reference: `/home/user/kz-wasm/ext/ts-src`, `/home/user/kz-wasm/ext/three-slicer/package`

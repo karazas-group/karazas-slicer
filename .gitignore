@@ -1,4 +1,4 @@
-# Native Orca (AppImage extract or symlink), run.py output, logs
+# Native upstream slicer (AppImage extract or symlink), run.py output, logs
 eval/app
 eval/work/
 eval/*.log

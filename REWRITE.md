@@ -2,12 +2,12 @@
 
 Goal: the pricer's slicer as one directory, `kz/`, with one file per stage or
 function, so each piece can be made smaller and faster on its own. The grams
-stay exactly what they are today. Over time nothing of Orca is left in the
+stay exactly what they are today. Over time nothing of upstream is left in the
 path. The wasm build, the patch and the profiles stay as they are until a
 stage replaces them.
 
 The pricer takes an STL and settings and returns grams of filament. It never
-writes G-code. That is the freedom: any Orca code that only exists to make
+writes G-code. That is the freedom: any upstream code that only exists to make
 G-code, or to serve a setting the pricer never sends, can go.
 
 Status: stage 1 is done (section 6). Everything after it is a plan, and
@@ -50,20 +50,20 @@ When a change can't be bit-identical (Clipper output order in the organic
 supports, for one), the owner's limit is 0.001 g on every case:
 `node eval/gate.cjs <js> --tol=0.001` passes cases within that and prints
 the largest difference. Such a change also needs a visual check of the
-supports against native Orca, because grams can hide a support that moved:
+supports against native upstream, because grams can hide a support that moved:
 
 ```
 bash wasm/link_check.sh                                  # validation build, writes G-code
 node eval/gcode.cjs $OUT/out/check/kz-slicer.js <model.stl> ours.gcode
-python3 eval/native_gcode.py <website>/build/profiles <model.stl> orca.gcode   # eval/app = Orca AppImage extract
-python3 eval/supports_view.py ours.gcode ours orca.gcode orca view.png
+python3 eval/native_gcode.py <website>/build/profiles <model.stl> native.gcode   # eval/app = upstream AppImage extract
+python3 eval/supports_view.py ours.gcode ours native.gcode native view.png
 ```
 
 `supports_view.py` draws front, side and top views of both with supports in
 red, and prints the support length per file and the most different layer.
-Baseline on 2026-10-26, today's build vs native Orca 2.4.2 with the same
+Baseline on 2026-10-26, today's build vs native upstream 2.4.2 with the same
 settings: Benchy 49562.8 vs 49562.7 mm of support over 185 layers each,
-mushroom identical, sphere40 +0.09%, inverted cone +0.37% (Orca's arrange
+mushroom identical, sphere40 +0.09%, inverted cone +0.37% (upstream's arrange
 turns the model a little on its bed, which moves the trees slightly).
 
 The old 28-case matrix over the P2S and S1 printer profiles is retired
@@ -72,8 +72,8 @@ and S1 was the only thing keeping Arachne in.
 
 ## 2. What runs today
 
-Cited from the patched tree (`orca/src/libslic3r`, Orca 2.4.2 plus
-`patches/orca-2.4.2-wasm.patch`).
+Cited from the patched tree (`upstream/src/libslic3r`, upstream 2.4.2 plus
+`patches/libslic3r-2.4.2.patch`).
 
 ```
 kz_slice (kz/entry.cpp)                   thread limits, override parsing
@@ -174,9 +174,9 @@ What that says:
 
 ## 4. Target layout
 
-One directory. One file per stage; a stage that is several Orca functions
+One directory. One file per stage; a stage that is several upstream functions
 becomes several files only when they are separable by data type. A file owns
-its algorithm and its private helpers, includes `kz.hpp` and Orca headers for
+its algorithm and its private helpers, includes `kz.hpp` and upstream headers for
 the data types (`Polygon`, `ExPolygon`, `Surface`, `ExtrusionEntity`, `Print`)
 until those are replaced too, and exports nothing but the functions named in
 `kz.hpp`.
@@ -188,7 +188,7 @@ kz/
   entry.cpp            DONE  kz_slice(), main(), thread limits, override string
   pipeline.cpp         DONE  slice_one(): order of the stages, profile cache
   volume_sum.cpp       DONE  kz_extruded_volume(): the sum
-  stubs/*.cpp          DONE  stand-ins that keep unused Orca code out of the link
+  stubs/*.cpp          DONE  stand-ins that keep unused upstream code out of the link
   stl_load.cpp         binary/ASCII STL bytes -> indexed_triangle_set, repaired
   mesh_slice.cpp       indexed_triangle_set + layer heights -> polygons per layer
   layers.cpp           layer height profile -> z ranges (generate_object_layers)
@@ -208,7 +208,7 @@ kz/
   process.cpp          Print::process replacement (the order, the parallelism)
 ```
 
-Stage contracts (inputs and outputs are Orca types until a stage replaces
+Stage contracts (inputs and outputs are upstream types until a stage replaces
 the type as well; all coordinates stay `coord_t` = int64 scaled by 1e6, except
 the mesh, which is `float`):
 
@@ -260,7 +260,7 @@ Follows from the closed set (no further decision needed):
   hybrid), `SupportMaterial.cpp` (3309, normal/snug) and the parts of
   `SupportCommon.cpp` only they use go.
 - Infill patterns: only the ones `karaza.json` names (gyroid sparse,
-  monotonic-line top and bottom) and the solid infill Orca uses
+  monotonic-line top and bottom) and the solid infill upstream uses
   internally. The rest of `Fill/` (adaptive cubic, lightning, Hilbert,
   Archimedean, TPMS, 3D honeycomb, ...) goes.
 - G-code writer, `GCodeProcessor`, cooling buffer, pressure advance, arc
@@ -295,7 +295,7 @@ before the sum. Those are stages to port (`simplify.cpp`), not delete.
 What it did: it created `kz/`, moved the driver and the five stand-ins in
 (`git mv`, history follows), and split the 259-line driver into three files by
 function: `entry.cpp` (exported function, threads, override string),
-`pipeline.cpp` (order of the Orca calls, profile cache) and `volume_sum.cpp`
+`pipeline.cpp` (order of the upstream calls, profile cache) and `volume_sum.cpp`
 (the extrusion sum). `kz.hpp` is the interface. The build now reads
 `kz/sources.txt` (section 8). The logic of every moved function is the old
 text without edits, apart from names and the namespace of `lap()`.
@@ -304,8 +304,8 @@ Why this and not STL load first: it is the only stage whose result can be
 proven identical bit for bit, and it fixes the structure (one file per stage,
 sources list, gate) that every later stage uses. It does not make anything
 faster: wasm size +1 KB, times unchanged within noise (below). It does not
-replace Orca code, because the sum was never Orca code. STL load is stage 2
-and replaces Orca for real.
+replace upstream code, because the sum was never upstream code. STL load is stage 2
+and replaces upstream for real.
 
 Results:
 - Matrix: 28/28 identical to `eval/golden-grams.txt`, and the full
@@ -346,7 +346,7 @@ stage hard. Each stage is its own commit and passes the gate first.
    with no variable layer height profile (fixed `layer_height` and
    `initial_layer_print_height`). Exactness: the doubles must be the same
    `coordf_t` values; `print_z` and `slice_z` are summed, not multiplied, in
-   Orca, so keep the order of additions. Test: dump the pair list for 30
+   upstream, so keep the order of additions. Test: dump the pair list for 30
    layer-height inputs.
 4. **mesh_slice.cpp** (payoff 22%, and the +27 MB). `slice_mesh` cuts each
    triangle with each layer's plane, chains segments into loops, unions them.
@@ -412,14 +412,14 @@ stage hard. Each stage is its own commit and passes the gate first.
     straight function that builds one `PrintObject` per model. Delete
     `StepStates`, `set_started/set_done`, cancel checks, status callbacks
     (keep `lap` markers), the shared-object logic and the cache path in
-    `Print::process` (`use_cache`). This is where the Orca `Print` class is
+    `Print::process` (`use_cache`). This is where the upstream `Print` class is
     finally replaced; only after the stages it calls are in `kz/`.
 11. **support_organic.cpp**: another agent. This plan only fixes its
     interface: input is the layers after `prepare_infill` (outlines,
     perimeters, bridge `fill_surfaces`), output is `SupportLayer::support_fills`
     for `volume_sum`. Per the Print.cpp comment it must run beside `infill`.
 12. **Last: drop the extrusion entities** (section 4, final shape) and
-    **last: drop Clipper**'s Orca wrapper layer for a kz-owned integer
+    **last: drop Clipper**'s upstream wrapper layer for a kz-owned integer
     polygon library, if profiling after all this says it is still the cost.
     That one changes the exactness story completely, since Clipper's output
     is the contract everything above was matched against. It needs its own
@@ -432,26 +432,26 @@ easy to dump and compare exactly.
 
 ## 8. How the build changes
 
-Today `libslic3r_all.a` holds every Orca object, and a few objects in
+Today `libslic3r_all.a` holds every upstream object, and a few objects in
 `roots/` (built by `roots.sh`) are linked ahead of it so the linker takes
 their symbols instead of the archive's. Stage 1 turned that into a list:
 
 `kz/sources.txt`: `name  link  source  [flags]` per line. `roots.sh [name...]`
-compiles each line with `cc.sh` (same flags as the Orca files) into
+compiles each line with `cc.sh` (same flags as the upstream files) into
 `$OUT/roots/<name>.o`; `link_web.sh` links the `web` and `both` lines;
 `link_check.sh` the `check` and `both` lines. `cc.sh` takes an `OBJ` name so
 two builds of one source can coexist.
 
-To replace an Orca file with a kz stage:
+To replace an upstream file with a kz stage:
 1. Write `kz/<stage>.cpp` defining the same symbols, add a line to
    `sources.txt`.
-2. Link. If the stage replaces the whole Orca object, nothing from that
-   archive member is pulled and the Orca code is gone from the wasm. If it
+2. Link. If the stage replaces the whole upstream object, nothing from that
+   archive member is pulled and the upstream code is gone from the wasm. If it
    defines only some of the member's symbols and something else still needs
    the rest, the link fails with `duplicate symbol`. That error is the check
    that the replacement is complete; do not paper over it with
    `--allow-multiple-definition`.
-3. Once a stage is proven, also delete the Orca object from the archive
+3. Once a stage is proven, also delete the upstream object from the archive
    (`emar d libslic3r_all.a <member>`) and the file from
    `wasm/libslic3r-sources.txt`, so the next fresh build cannot silently use
    the old code. Later, when `kz/` holds most of the path, the archive step
@@ -459,20 +459,20 @@ To replace an Orca file with a kz stage:
 4. Run `eval/gate.cjs`, then the stage's own dump comparison.
 
 Things that will bite:
-- Orca headers are still included by the kz files, so changes to a stage
-  that touches a type (`Surface`, `LayerRegion`) recompile Orca's callers.
+- Upstream headers are still included by the kz files, so changes to a stage
+  that touches a type (`Surface`, `LayerRegion`) recompile upstream's callers.
   Replace the type only in the step that replaces its last user.
-- The patch (`patches/orca-2.4.2-wasm.patch`) edits Orca files that stages
+- The patch (`patches/libslic3r-2.4.2.patch`) edits upstream files that stages
   will replace (Print.cpp, Clipper, admesh). When a stage replaces a patched
   file, its patch hunk is deleted from the patch in the same commit, so the
   patch only ever lists code that still runs. The patch applies to a clean
-  Orca 2.4.2; check that after each such change (not done in stage 1,
+  upstream 2.4.2; check that after each such change (not done in stage 1,
   which touched no patched file).
-- Orca is AGPL; every kz file that is copied or adapted from it keeps the
+- Upstream is AGPL; every kz file that is copied or adapted from it keeps the
   header saying so (the stubs do). Files written from scratch do not need it,
   but the whole binary is still AGPL.
 - Link order vs archives: wasm objects pulled out of an archive are
-  chosen per symbol; static initialisers in a replaced Orca file go away with
+  chosen per symbol; static initialisers in a replaced upstream file go away with
   it. If a stage replaces a file with registration side effects (the `Fill`
   factory, config `def` tables), check that the symbols it defined are still
   all defined.
@@ -493,7 +493,7 @@ Things that will bite:
   14.54 g with the website's P2S files at the time of writing, 13.95 g with
   `eval/profiles`). The golden grams are the `eval/profiles` numbers, as the
   matrix always was.
-- Native Orca differs from the wasm by up to 0.09 g on the matrix (README);
+- Native upstream differs from the wasm by up to 0.09 g on the matrix (README);
   the gate measures against the wasm, not native.
 
 ## 10. Parked ideas
@@ -525,7 +525,7 @@ Measured but not shipped, to pick up when the stage they live in is rewritten:
   - Supports off, per 27 cases: infill 2.56 s (33%), prepare_infill 1.52 s,
     perimeters 1.28 s, STL load 0.81 s, slice 0.66 s, simplify 0.60 s.
   - Supports on: the support step is 64% (17.1 s of 26.6 s).
-  - Inside infill, `FillConcentricInternal` (Orca's
+  - Inside infill, `FillConcentricInternal` (upstream's
     `detect_narrow_internal_solid_infill`: thin solid strips get Arachne)
     is 36% of all CPU on sphere40 and invcone, 21% on sphere-coarse, 7% on
     Benchy. Each strip is one ring of ~290 points and its boost Voronoi
@@ -545,7 +545,7 @@ Measured but not shipped, to pick up when the stage they live in is rewritten:
   page slices an 8 mm generated sphere with supports and drops the result.
   Chrome, dev pricer: first sphere40 slice 1.4 s -> 0.82 s. Tiered code is
   shared by recycled workers, so later slices were already warm.
-- OrcaSlicer 2.5.0-alpha (Oct 2026), checked against our tree:
+- Upstream 2.5.0-alpha (Oct 2026), checked against our tree:
   - PR 16183 (simplify steps copied the whole PrintConfig per path): ported
     to the 2.4.2 patch, 54/54 bit-identical, 1-4% faster. simplify.cpp must
     keep reading the config by reference.
@@ -582,7 +582,7 @@ Measured but not shipped, to pick up when the stage they live in is rewritten:
 
 ## 11. Later: multicolour
 
-Not now. Orca's 3MF importer and wipe tower stay in the source tree for
+Not now. Upstream's 3MF importer and wipe tower stay in the source tree for
 this (not deleted, just not linked). Once the generators export colours in
 their 3MF files (open in Linear), the pricer could send a 3MF to the slicer and price each colour. In
 the module layout that is a separate reader stage (`load_3mf.cpp`) and a
@@ -592,11 +592,11 @@ assumes one material.
 
 ## 12. Clipper2 (on main since 2026-10-31)
 
-main uses Clipper2 (OrcaSlicer PR 15969, Clipper 2.0.1) as the clipping
+main uses Clipper2 (upstream PR 15969, Clipper 2.0.1) as the clipping
 module instead of Clipper1. `deps_src/clipper/` and `libslic3r/clipper.cpp`
 are gone; `ClipperUtils.cpp` wraps `deps_src/clipper2`, and `ClipperZUtils.cpp`
 is new. The port is `patches/clipper2.patch`, a diff on top of
-`patches/orca-2.4.2-wasm.patch`.
+`patches/libslic3r-2.4.2.patch`.
 
 Measured (2026-10-27, `eval/ab.cjs`, A = Clipper1 `leak` build, B = this
 build, 2 reps alternated per case): B/A = 0.767 (133.6 s -> 102.4 s over the
@@ -617,9 +617,9 @@ identical. Clipper1 golden numbers are only in git history before this
 branch's commit.
 
 Rebuild:
-1. Clean Orca 2.4.2 git HEAD, then `patch -p1 < patches/orca-2.4.2-wasm.patch`.
+1. Clean upstream 2.4.2 git HEAD, then `patch -p1 < patches/libslic3r-2.4.2.patch`.
 2. Then `patch -p1 < patches/clipper2.patch` (no rejects on the current main patch).
-3. `ORCA_WASM=<root> OUT=<build> bash wasm/cc.sh <file>` for every line of
+3. `KZ_WASM=<root> OUT=<build> bash wasm/cc.sh <file>` for every line of
    `wasm/libslic3r-sources.txt` (minus `clipper.cpp` and `Clipper2Utils.cpp`,
    plus `ClipperZUtils.cpp`); a few sources fail for missing optional
    libraries (nlopt, openvdb, OCCT, CGAL LEDA) as before, and those are

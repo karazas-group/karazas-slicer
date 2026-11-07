@@ -1,4 +1,4 @@
-# Slices one model with native OrcaSlicer 2.4.2 (eval/app, the AppImage
+# Slices one model with the native upstream 2.4.2 build (eval/app, the AppImage
 # extract) using the full profiles the pricer's karaza.json was cut from and
 # the pricer's overrides, and writes the G-code. The reference picture for
 # eval/supports_view.py.

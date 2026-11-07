@@ -1,4 +1,4 @@
-# wasm build after the Arachne fix (Oct 20, 2026), eval/wasm-batch.sh. Native numbers: orca-native.txt.
+# wasm build after the Arachne fix (Oct 20, 2026), eval/wasm-batch.sh. Native numbers: native-2.4.2.txt.
 cube20 p2s-s0 rc=0 time_s=1833.1 filament_mm=1189.7 filament_g=3.55 wall=2.2s
 cube20 p2s-org35 rc=0 time_s=1833.1 filament_mm=1189.7 filament_g=3.55 wall=2.2s
 cube20 s1-s0 rc=0 time_s=1450.9 filament_mm=1330.6 filament_g=3.97 wall=2.3s

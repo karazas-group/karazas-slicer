@@ -4,7 +4,7 @@ defines (strong/weak) a symbol some already-pulled object references. Mimics a s
 usage: reach.py <root.o>... -- <candidate objs dir>..."""
 import subprocess, sys, os, collections
 
-NM = os.path.join(os.environ.get('ORCA_WASM', os.path.expanduser('~/orca-wasm')), 'emsdk/upstream/bin/llvm-nm')
+NM = os.path.join(os.environ.get('KZ_WASM', os.path.expanduser('~/kz-wasm')), 'emsdk/upstream/bin/llvm-nm')
 args = sys.argv[1:]
 sep = args.index('--')
 roots, dirs = args[:sep], args[sep + 1:]

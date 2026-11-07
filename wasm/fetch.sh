@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Downloads everything the wasm build needs into $ORCA_WASM (default
-# ~/orca-wasm) and applies our patches to Orca. Then run setup-deps.sh, and
+# Downloads everything the wasm build needs into $KZ_WASM (default
+# ~/kz-wasm) and applies our patches to the upstream source. Then run setup-deps.sh, and
 # the build steps in README.md "Building". Re-running skips what is there.
 set -e
-W=${ORCA_WASM:-$HOME/orca-wasm}; REPO=$(cd "$(dirname "$0")/.." && pwd)
+W=${KZ_WASM:-$HOME/kz-wasm}; REPO=$(cd "$(dirname "$0")/.." && pwd)
 mkdir -p $W/deps-src; cd $W
 clone() { [ -d "$2" ] || git clone -q --depth 1 --branch "$3" "$1" "$2"; }
 
 [ -d emsdk ] || { git clone -q https://github.com/emscripten-core/emsdk.git emsdk && (cd emsdk && ./emsdk install 6.0.13 && ./emsdk activate 6.0.13); }
 
-if [ ! -d orca ]; then
-  clone https://github.com/SoftFever/OrcaSlicer.git orca v2.4.2
-  patch -p1 -s -d orca < $REPO/patches/orca-2.4.2-wasm.patch
-  patch -p1 -s -d orca < $REPO/patches/clipper2.patch
+if [ ! -d upstream ]; then
+  clone https://github.com/SoftFever/OrcaSlicer.git upstream v2.4.2
+  patch -p1 -s -d upstream < $REPO/patches/libslic3r-2.4.2.patch
+  patch -p1 -s -d upstream < $REPO/patches/clipper2.patch
 fi
 
 cd deps-src

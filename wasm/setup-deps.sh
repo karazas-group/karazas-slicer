@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Builds the wasm dependencies under $ORCA_WASM (default ~/orca-wasm), the
+# Builds the wasm dependencies under $KZ_WASM (default ~/kz-wasm), the
 # layout README.md "Building" describes. Sources must already be there:
-#   emsdk/ (Emscripten 6.0.13, activated), orca/ (v2.4.2 + patches),
+#   emsdk/ (Emscripten 6.0.13, activated), upstream/ (v2.4.2 + patches),
 #   deps-src/{boost-1.84.0, onetbb @af14bb5, qhull @v8.0.2, eigen-5.0.1,
 #             cereal @v1.3.2, CGAL-5.6.3, libnoise (SoftFever/Orca-deps-libnoise
 #             @1.0), libpng @v1.6.35 and zlib @v1.3.1 (headers only)}
@@ -10,7 +10,7 @@
 # model as libslic3r), qhull with -sSUPPORT_LONGJMP=wasm, Boost without
 # context/coroutine/fiber. Steps can be run alone: setup-deps.sh tbb boost ...
 set -e
-W=${ORCA_WASM:-$HOME/orca-wasm}; S=$W/deps-src; J=${JOBS:-$(nproc)}
+W=${KZ_WASM:-$HOME/kz-wasm}; S=$W/deps-src; J=${JOBS:-$(nproc)}
 source $W/emsdk/emsdk_env.sh >/dev/null 2>&1
 steps=${*:-tbb qhull boost boostlog headers libnoise}
 

@@ -1,5 +1,5 @@
 // The pricer reads 3MF and OBJ itself (three.js) and hands the slicer a
-// binary STL, so Orca's own file readers are never called. Model.cpp still
+// binary STL, so the upstream file readers are never called. Model.cpp still
 // references them from Model::read_from_file, which pulls in the 3MF/AMF/OBJ
 // parsers, the preset system, SVG/Emboss, PNG and zip. These stand in for
 // them so the linker leaves all of that out.

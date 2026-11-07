@@ -1,9 +1,13 @@
 # Karaza slicer
 
-OrcaSlicer's slicing core (libslic3r, v2.4.2) compiled to WebAssembly, so the
+Karaza's own slicer, compiled to WebAssembly, so the
 3D pricer can slice a customer's model in their browser with the same engine
 and the same profiles the shop prints with. It replaced Kiri:Moto in the pricer
 on 2026-10-20.
+
+It started from an open-source slicing core (libslic3r 2.4.2, credited under
+Licence below) and is being rewritten stage by stage (`REWRITE.md`). In these
+docs, "upstream" means that 2.4.2 source as fetched by `wasm/fetch.sh`.
 
 This repo started as the `karaza-slicer` branch of the website repo and moved
 here on 2026-10-24 with its history. Nothing in it depends on the website.
@@ -32,17 +36,17 @@ From the first spike (full write-up in `REPORT.md`):
 
 - Unmodified libslic3r plus a 70-line driver links into one 8.4 MB `.wasm`
   (2.66 MB gzip, before any trimming).
-- All 28 test cases slice. 24 give the same grams as the native OrcaSlicer
+- All 28 test cases slice. 24 give the same grams as the native upstream build
   2.4.2 CLI, to the hundredth of a gram, on the P2S and Ender-3 S1 profiles,
   with and without organic supports at 35°. Three are 0.01 g off, and Benchy
   on the S1 with organic supports is 0.15 g off (0.7%).
 - The 40 mm sphere and 3DBenchy used to crash inside Arachne. That was a
-  32-bit `size_t` bug in Orca's `SkeletalTrapezoidation::interpolate`, fixed
+  32-bit `size_t` bug in upstream's `SkeletalTrapezoidation::interpolate`, fixed
   in the patch (REPORT.md §8).
 - Speed (Oct 20, 4-core box, Node): linking with mimalloc instead of the
   default allocator cut the 28-case matrix from 240 s to 138 s with the same
   grams. Organic supports went from 10-28 s to 4.6-12.9 s. Emscripten's
-  default allocator takes one global lock and Orca's threads allocate all
+  default allocator takes one global lock and upstream's threads allocate all
   the time.
 - Warm slices are cheap: `kz_slice()` keeps the default config and the
   flattened profiles between calls, and a second slice of the 20 mm cube
@@ -51,7 +55,7 @@ From the first spike (full write-up in `REPORT.md`):
 - Pricing build (Oct 20): 6.5 MB raw, 2.0 MB gzip, 1.42 MB brotli 11. It
   stops after `Print::process()` and sums the plastic in the toolpaths with
   the flow ratios `GCode::_extrude` applies, instead of writing G-code. On
-  16 cases (8 models, supports on/off) that's within 0.007 g of Orca's own
+  16 cases (8 models, supports on/off) that's within 0.007 g of upstream's own
   G-code totals, and slices are 27-70% faster (Benchy 6.2 s to 4.0 s in
   Node). File readers, presets, the G-code writer and parser, the prime
   tower and the template parser are replaced by stand-ins in
@@ -60,17 +64,17 @@ From the first spike (full write-up in `REPORT.md`):
   looking for a byte above 127 in the first 128 bytes after the header; a
   binary STL with zero normals and round coordinates has none, so it was
   parsed as ASCII and failed. The pricer writes zero normals, so any such
-  model hit it. Native Orca 2.4.2 fails on the same file. The patch now
+  model hit it. Native upstream 2.4.2 fails on the same file. The patch now
   also calls a file binary when the facet count in its header gives its
   exact size. Same grams as native (fed an ASCII copy) on all 4 cases, and
   the other 28 cases are unchanged to 0.001 g.
 - Clipper fix (Oct 24). Profiling Benchy with supports showed half the
-  time on one thread, inside two Clipper offsets in Orca's bridge-over-infill
+  time on one thread, inside two Clipper offsets in upstream's bridge-over-infill
   code: 0.65 s for one shrink of a 20k point curve on layer 2. At each concave
   corner Clipper adds a point back at the vertex, which makes a spike as long
   as the offset. A curve sampled every 2 µm zigzags at the nanometre level, so
   it gets thousands of them, and the union that cleans them up goes
-  quadratic. Native g++ is just as slow (0.48 s), so it's Orca's Clipper, not
+  quadratic. Native g++ is just as slow (0.48 s), so it's upstream's Clipper, not
   wasm. The patch leaves that point out at almost flat corners (cos ≥
   0.9999 since Oct 25, 0.99999 before), the way Clipper2 does, but only on paths with 1024 or more of
   them. Without that limit organic supports shifted by up to 0.18 g, since
@@ -159,10 +163,10 @@ From the first spike (full write-up in `REPORT.md`):
 1. It's the dev pricer's slicer (Karazas-website 72fadf0). Same grams as
    Node in headless Chromium; Benchy takes 6.1 s, smaller models 0.2 to
    1.6 s. Still to do: time startup on a phone.
-2. More printers. Profiles are flattened from Orca's own `resources/profiles`
-   with `eval/flatten.py`, so any Orca, Prusa or Bambu printer Orca ships can
+2. More printers. Profiles are flattened from upstream's own `resources/profiles`
+   with `eval/flatten.py`, so any printer in the upstream profile library (Prusa and Bambu included) can
    be added the same way.
-3. Later: a pricer module in the staff panel to import Orca / Prusa / Bambu
+3. Later: a pricer module in the staff panel to import Prusa / Bambu / upstream
    printer and filament profiles, flatten them on the server and publish them
    to the pricer.
 
@@ -171,7 +175,7 @@ open: preloading makes the first quote faster but costs 2 MB on limited data.
 
 ## Layout
 
-- `patches/orca-2.4.2-wasm.patch`: the small source patches (STEP and
+- `patches/libslic3r-2.4.2.patch`: the small source patches (STEP and
   JPEG cut out, two 32-bit `size_t` fixes, a missing include, the platform
   check, `KZ_NO_GCODE` guards on G-code export in Print.cpp, admesh's
   binary STL detection and edge matching, the Clipper offset fix, organic supports alongside
@@ -180,7 +184,7 @@ open: preloading makes the first quote faster but costs 2 MB on limited data.
   both: `deps.sh` builds `deps_src/clipper` into `libdeps.a`, and libslic3r's
   `clipper.cpp` includes it again under the `Slic3r` namespace, so rebuild
   both after changing it.
-  Apply to a clone of OrcaSlicer at tag v2.4.2.
+  Apply to a clone of upstream at tag v2.4.2.
 - `kz/`: the pricer's own code, one file per stage (see `REWRITE.md`):
   `entry.cpp` (`kz_slice()`: STL + flattened profiles + `key value`
   overrides in, grams out), `pipeline.cpp`, `volume_sum.cpp`, and
@@ -195,21 +199,21 @@ open: preloading makes the first quote faster but costs 2 MB on limited data.
   pricer's overrides) through a built module and compares the filament
   length bit for bit with `golden-mm.txt` (REWRITE.md section 1). The old
   P2S/S1 matrix and the native reference: `wasm-batch.sh` runs those 28 cases
-  through the wasm build. `run.py` slices one model with the Orca CLI
+  through the wasm build. `run.py` slices one model with the upstream CLI
   and prints grams, `batch.sh` runs the whole matrix, `flatten.py` turns an
-  Orca system preset into one flat JSON. `profiles/` has the flattened P2S and
+  upstream system preset into one flat JSON. `profiles/` has the flattened P2S and
   Ender-3 S1 machine, process and PLA files. 3DBenchy isn't included (11 MB);
   grab it from 3dbenchy.com into `eval/models/benchy.stl`.
-- `eval/results/`: native Orca numbers, the wasm parity run, and the compile
+- `eval/results/`: native upstream numbers, the wasm parity run, and the compile
   census.
 
 ## Building
 
-The scripts expect everything under `$ORCA_WASM` (default `~/orca-wasm`) and
-write objects and output to `$OUT` (default `$ORCA_WASM/build`):
+The scripts expect everything under `$KZ_WASM` (default `~/kz-wasm`) and
+write objects and output to `$OUT` (default `$KZ_WASM/build`):
 
 ```
-bash wasm/fetch.sh        # emsdk 6.0.13, Orca v2.4.2 + both patches, dep sources
+bash wasm/fetch.sh        # emsdk 6.0.13, upstream v2.4.2 + both patches, dep sources
 bash wasm/setup-deps.sh   # TBB, qhull, Boost, Boost.Log, libnoise, merged headers
 bash wasm/build.sh        # libslic3r, deps, archives, roots, link_web.sh
 ```
@@ -228,7 +232,7 @@ node eval/heap.cjs $OUT/out/web/kz-slicer.js 4                           # flat
 The older native-style driver is still there. To test it:
 
 ```
-node $OUT/out/orca_fixed.js model.stl "machine.json;process.json;pla.json" out.gcode \
+node $OUT/out/kz_fixed.js model.stl "machine.json;process.json;pla.json" out.gcode \
   enable_support 1 support_type "tree(auto)" support_style organic support_threshold_angle 35
 ```
 
