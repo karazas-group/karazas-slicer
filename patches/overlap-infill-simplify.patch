@@ -1,0 +1,35 @@
+--- a/src/libslic3r/Print.cpp	2026-11-07 22:44:55.343877996 +0000
++++ b/src/libslic3r/Print.cpp	2026-11-07 22:44:55.345689962 +0000
+@@ -2329,12 +2329,14 @@
+         // perimeters, so not with it.
+         tbb::task_group kz_support_group;
+         struct KzWait { tbb::task_group &g; bool waited = false; ~KzWait() { if (!waited) { try { g.wait(); } catch (...) {} } } } kz_wait{kz_support_group};
++        std::vector<PrintObject*> kz_support_beside;
+         for (PrintObject *obj : m_objects)
+             if (need_slicing_objects.count(obj) != 0 && obj->has_support() && !obj->has_raft() && obj->layer_count() > 1 &&
+                 is_tree(obj->config().support_type.value) && obj->config().support_style.value == smsTreeOrganic &&
+                 obj->get_shared_object() == nullptr && !obj->need_z_contouring()) {
+                 obj->prepare_infill();
+                 kz_support_group.run([obj] { obj->generate_support_material(); });
++                kz_support_beside.push_back(obj);
+             }
+         for (PrintObject *obj : m_objects) {
+             if (need_slicing_objects.count(obj) != 0) {
+@@ -2368,6 +2370,17 @@
+             }
+         }
+ 
++        // Karaza: simplifying the infill only touches the fills, which the supports don't
++        // read (make_fills already runs beside them), so do it while they finish instead of
++        // after. The walls wait: the supports read the perimeters.
++        for (PrintObject *obj : kz_support_beside)
++            if (obj->set_started(posSimplifyInfill)) {
++                tbb::parallel_for(tbb::blocked_range<size_t>(0, obj->m_layers.size()), [obj](const tbb::blocked_range<size_t> &range) {
++                    for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx)
++                        obj->m_layers[layer_idx]->simplify_infill_extrusion_path();
++                });
++                obj->set_done(posSimplifyInfill);
++            }
+         kz_wait.waited = true;
+         kz_support_group.wait();
+         tbb::parallel_for(tbb::blocked_range<int>(0, int(m_objects.size())),
