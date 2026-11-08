@@ -14,6 +14,7 @@ if [ ! -d upstream ]; then
   patch -p1 -s -d upstream < $REPO/patches/libslic3r-2.4.2.patch
   patch -p1 -s -d upstream < $REPO/patches/clipper2.patch
   patch -p1 -s -d upstream < $REPO/patches/parallel-stl-load.patch
+  patch -p1 -s -d upstream < $REPO/patches/parallel-brim.patch
 fi
 
 cd deps-src
