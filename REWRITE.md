@@ -540,7 +540,7 @@ Measured but not shipped, to pick up when the stage they live in is rewritten:
   next ones (V8 runs wasm in its baseline compiler until code is hot;
   sphere40 1.07 s cold vs 0.65 s warm in Node). The benches above reuse one
   module, so they measure the warm case; a customer's first quote is cold.
-  Fixed on the website side (Karazas-website 49d285e, `orcaWarmup` in
+  Fixed on the website side (Karazas-website 49d285e, `kzWarmup` in
   src/entries/slicer.ts): when the customer reaches for the upload box, the
   page slices an 8 mm generated sphere with supports and drops the result.
   Chrome, dev pricer: first sphere40 slice 1.4 s -> 0.82 s. Tiered code is
