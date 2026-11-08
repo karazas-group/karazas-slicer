@@ -13,6 +13,7 @@ if [ ! -d upstream ]; then
   clone https://github.com/SoftFever/OrcaSlicer.git upstream v2.4.2
   patch -p1 -s -d upstream < $REPO/patches/libslic3r-2.4.2.patch
   patch -p1 -s -d upstream < $REPO/patches/clipper2.patch
+  patch -p1 -s -d upstream < $REPO/patches/parallel-stl-load.patch
 fi
 
 cd deps-src
