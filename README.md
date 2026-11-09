@@ -32,6 +32,13 @@ has no extra terms from us. Keep `NOTICE` with every copy.
 
 ## Where it stands
 
+- 2026-11-09, `dev` branch: the pricer prices supports as normal grid
+  supports, not organic trees. Support slices take 12.2 s instead of 26.5 s
+  on the 27 gate cases, and parts that need support weigh up to 4 g more
+  (hollowbox40 26.7 to 30.7 g). `eval/golden-mm.txt` is the grid baseline.
+  Organic supports come back on the `organic-supports` branch once they're
+  fast enough.
+
 From the first spike (full write-up in `REPORT.md`):
 
 - Unmodified libslic3r plus a 70-line driver links into one 8.4 MB `.wasm`
@@ -233,7 +240,7 @@ The older native-style driver is still there. To test it:
 
 ```
 node $OUT/out/kz_fixed.js model.stl "machine.json;process.json;pla.json" out.gcode \
-  enable_support 1 support_type "tree(auto)" support_style organic support_threshold_angle 35
+  enable_support 1 support_type "normal(auto)" support_style grid support_threshold_angle 35
 ```
 
 It prints `rc=0 time_s=... filament_mm=... filament_g=...`.

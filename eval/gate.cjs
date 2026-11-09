@@ -16,7 +16,7 @@ const CHOICES = [[3, 40], [2, 15], [4, 80]];
 const overrides = (walls, infill, sup) => [
   ['printable_area', '0x0,1000x0,1000x1000,0x1000'], ['printable_height', 1000],
   ['wall_loops', walls], ['sparse_infill_density', infill + '%'], ['enable_support', sup],
-  ...(sup ? [['support_type', 'tree(auto)'], ['support_style', 'organic'], ['support_threshold_angle', 35],
+  ...(sup ? [['support_type', 'normal(auto)'], ['support_style', 'grid'], ['support_threshold_angle', 35],
     ['support_interface_top_layers', 8], ['support_interface_bottom_layers', 8]] : []),
 ].map(([k, v]) => `${k}\t${v}\n`).join('');
 (async () => {

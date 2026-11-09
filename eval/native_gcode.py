@@ -10,7 +10,7 @@ walls, infill, sup = (rest + ['3', '40', '1'][len(rest):])[:3]
 proc = json.load(open(f'{prof}/p2s-process.json'))
 over = {'wall_loops': walls, 'sparse_infill_density': infill + '%', 'enable_support': sup, 'brim_type': 'outer_only'}
 if sup == '1':
-    over.update({'support_type': 'tree(auto)', 'support_style': 'organic', 'support_threshold_angle': '35',
+    over.update({'support_type': 'normal(auto)', 'support_style': 'grid', 'support_threshold_angle': '35',
                  'support_interface_top_layers': '8', 'support_interface_bottom_layers': '8'})
 for k, v in over.items():
     proc[k] = [v] * len(proc[k]) if isinstance(proc.get(k), list) else v

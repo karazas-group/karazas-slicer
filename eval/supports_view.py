@@ -1,5 +1,5 @@
 # Draws the support toolpaths of two G-code files side by side, so a change
-# to the organic supports can be checked by eye against the native build, not
+# to the supports can be checked by eye against the native build, not
 # only by grams. Front (X-Z), side (Y-Z) and top (X-Y) views; support red,
 # the part grey. Each file is centred on its part, so where the native build arranged the
 # model on its bed doesn't matter. Also prints support length per file and

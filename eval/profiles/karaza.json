@@ -55,7 +55,8 @@
         "0x256"
     ],
     "printable_height": "256",
-    "support_type": "tree(auto)",
+    "support_type": "normal(auto)",
+    "support_style": "grid",
     "support_interface_top_layers": "2",
     "support_interface_bottom_layers": "2",
     "tree_support_branch_angle": "45",

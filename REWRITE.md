@@ -31,8 +31,9 @@ plus Benchy (`BENCHY=/path/benchy.stl` or put it in `eval/models/`; it is not
 in the repo, 11 MB), with `eval/profiles/karaza.json` (a copy of the
 website's `assets/kz/slicer/karaza.json`, the only settings file the pricer
 loads) and the pricer's overrides: walls/infill 3/40, 2/15 and 4/80, supports
-off and on (organic, 35 deg, 8 interface layers). The golden file was written
-on 2026-10-26 by the build at the start of this change (stage 1 plus the
+off and on (normal grid supports, 35 deg, 8 interface layers; organic until
+2026-11-09, see the `organic-supports` branch). The golden file was written
+on 2026-10-26, and rewritten on 2026-11-09 for the switch to grid supports, by the build at the start of this change (stage 1 plus the
 full-precision output) and checked against the website's shipped wasm: all
 54 equal at the 0.1 mm the old output printed. A second run gives the same
 bits, so threading doesn't make it flaky. `--write` records a new golden
@@ -236,7 +237,7 @@ support generator reads `fills`. Do it last.
 
 What the pricer sends: `karaza.json` (46 settings that change the plastic,
 nothing about the printer) plus overrides for `wall_loops`,
-`sparse_infill_density`, `enable_support`, and, with supports, organic tree
+`sparse_infill_density`, `enable_support`, and, with supports, normal grid
 supports at 35 deg with 8 interface layers, and a huge `printable_area`.
 That is a closed set. Anything outside it can go; `apply.cpp` should reject
 a value it doesn't support rather than price it wrong.

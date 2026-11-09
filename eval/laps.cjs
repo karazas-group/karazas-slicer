@@ -5,7 +5,7 @@ const fs = require('fs'), path = require('path');
 const M = __dirname + '/models/', P = __dirname + '/profiles/karaza.json';
 const CH = [[3, 40], [2, 15], [4, 80]];
 const ov = (w, i, s) => [['printable_area','0x0,1000x0,1000x1000,0x1000'],['printable_height',1000],['wall_loops',w],['sparse_infill_density',i+'%'],['enable_support',s],
-  ...(s ? [['support_type','tree(auto)'],['support_style','organic'],['support_threshold_angle',35],['support_interface_top_layers',8],['support_interface_bottom_layers',8]] : [])].map(([k,v])=>`${k}\t${v}\n`).join('');
+  ...(s ? [['support_type', 'normal(auto)'], ['support_style', 'grid'],['support_threshold_angle',35],['support_interface_top_layers',8],['support_interface_bottom_layers',8]] : [])].map(([k,v])=>`${k}\t${v}\n`).join('');
 (async () => {
   let laps = [];
   const F = require(path.resolve(process.argv[2]));
