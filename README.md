@@ -32,6 +32,16 @@ has no extra terms from us. Keep `NOTICE` with every copy.
 
 ## Where it stands
 
+- 2026-11-09, `website` branch (the build the pricer loads; `dev` stays
+  full detail for a future standalone slicer app). `patches/website-fast.patch`
+  skips two things the grams don't need: Arachne beads on narrow solid strips
+  become one path with the strip's area x layer height of plastic, and the
+  toolpath simplify pass is skipped. The gate here is
+  `eval/gate.cjs <js> --tol=0.05` against the `dev` golden: all 54 cases
+  within 0.008 g. Supports off 7.2 s to 5.9 s per rep, supports on 10.9 s to
+  9.6 s (dev numbers first). Turning `detect_narrow_internal_solid_infill`
+  off instead was as fast but 0.11 g heavy on the spheres. A coarser gyroid
+  tolerance changed nothing (it's capped by the line spacing).
 - 2026-11-09, `dev`: three exact speedups (`patches/infill-speed.patch`,
   `patches/boost-voronoi-mul.patch`), gate still 54/54 bit-identical.
   Infill connecting used 10 mm grid cells, so every short gyroid segment

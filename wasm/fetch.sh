@@ -16,6 +16,9 @@ if [ ! -d upstream ]; then
   patch -p1 -s -d upstream < $REPO/patches/parallel-stl-load.patch
   patch -p1 -s -d upstream < $REPO/patches/parallel-brim.patch
   patch -p1 -s -d upstream < $REPO/patches/infill-speed.patch
+  # website branch only: skips detail the pricer's grams don't need (build with
+  # -DKZ_FULL_DETAIL to turn the skips off again)
+  patch -p1 -s -d upstream < $REPO/patches/website-fast.patch
 fi
 
 cd deps-src

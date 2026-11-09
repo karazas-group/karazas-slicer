@@ -1,0 +1,91 @@
+--- a/src/libslic3r/Fill/FillConcentricInternal.cpp
++++ b/src/libslic3r/Fill/FillConcentricInternal.cpp
+@@ -1,6 +1,7 @@
+ #include "../ClipperUtils.hpp"
+ #include "../ExPolygon.hpp"
+ #include "../Surface.hpp"
++#include "../ExtrusionEntityCollection.hpp"
+ #include "../VariableWidth.hpp"
+ #include "Arachne/WallToolPaths.hpp"
+ 
+@@ -15,6 +16,30 @@
+ 
+     ThickPolylines thick_polylines_out;
+ 
++#ifndef KZ_FULL_DETAIL
++    // KZ website build: the pricer needs the plastic, not the beads. Arachne on
++    // these narrow solid strips costs about a fifth of a curved model's slice;
++    // a solid fill lays down its area times the layer height, so emit one
++    // straight path with that volume (area / spacing long at the flow's
++    // mm3_per_mm). Grams match the Arachne fill to a few hundredths of a gram.
++    {
++        double area = 0;
++        for (const ExPolygon &ex : this->no_overlap_expolygons) area += ex.area();
++        const double spacing = params.flow.scaled_spacing();
++        if (area > 0 && spacing > 0 && !this->no_overlap_expolygons.empty()) {
++            const Point a = this->no_overlap_expolygons.front().contour.first_point();
++            ExtrusionPath path(params.extrusion_role, params.flow.mm3_per_mm(), params.flow.width(), params.flow.height());
++            path.polyline.append(Point3(coord_t(a.x()), coord_t(a.y()), coord_t(0)));
++            path.polyline.append(Point3(coord_t(a.x() + coord_t(area / spacing)), coord_t(a.y()), coord_t(0)));
++            ExtrusionEntityCollection *coll = new ExtrusionEntityCollection();
++            coll->no_sort = this->no_sort();
++            coll->append(std::move(path));
++            out.push_back(coll);
++        }
++        return;
++    }
++#endif
++
+     for (size_t i = 0; i < this->no_overlap_expolygons.size(); ++i) {
+         ExPolygon &expolygon = this->no_overlap_expolygons[i];
+ 
+--- a/src/libslic3r/PrintObject.cpp
++++ b/src/libslic3r/PrintObject.cpp
+@@ -922,6 +922,7 @@
+         m_print->set_status(75, L("Optimizing toolpath"));
+         BOOST_LOG_TRIVIAL(debug) << "Simplify extrusion path of object in parallel - start";
+         //BBS: infill and walls
++#ifdef KZ_FULL_DETAIL // KZ website build: simplifying only shortens G-code; grams move by under 0.01 g
+         tbb::parallel_for(
+             tbb::blocked_range<size_t>(0, m_layers.size()),
+             [this](const tbb::blocked_range<size_t>& range) {
+@@ -931,6 +932,7 @@
+                 }
+             }
+         );
++#endif
+         m_print->throw_if_canceled();
+         BOOST_LOG_TRIVIAL(debug) << "Simplify wall extrusion path of object in parallel - end";
+         this->set_done(posSimplifyPath);
+@@ -940,6 +942,7 @@
+         m_print->set_status(75, L("Optimizing toolpath"));
+         BOOST_LOG_TRIVIAL(debug) << "Simplify infill extrusion path of object in parallel - start";
+         //BBS: infills
++#ifdef KZ_FULL_DETAIL // KZ website build: simplifying only shortens G-code; grams move by under 0.01 g
+         tbb::parallel_for(
+             tbb::blocked_range<size_t>(0, m_layers.size()),
+             [this](const tbb::blocked_range<size_t>& range) {
+@@ -949,6 +952,7 @@
+                 }
+             }
+         );
++#endif
+         m_print->throw_if_canceled();
+         BOOST_LOG_TRIVIAL(debug) << "Simplify infill extrusion path of object in parallel - end";
+         this->set_done(posSimplifyInfill);
+@@ -957,6 +961,7 @@
+     if (this->set_started(posSimplifySupportPath)) {
+         m_print->set_status(75, L("Optimizing toolpath"));
+         BOOST_LOG_TRIVIAL(debug) << "Simplify extrusion path of support in parallel - start";
++#ifdef KZ_FULL_DETAIL // KZ website build: simplifying only shortens G-code; grams move by under 0.01 g
+         tbb::parallel_for(
+             tbb::blocked_range<size_t>(0, m_support_layers.size()),
+             [this](const tbb::blocked_range<size_t>& range) {
+@@ -966,6 +971,7 @@
+                 }
+             }
+         );
++#endif
+         m_print->throw_if_canceled();
+         BOOST_LOG_TRIVIAL(debug) << "Simplify extrusion path of support in parallel - end";
+         this->set_done(posSimplifySupportPath);
