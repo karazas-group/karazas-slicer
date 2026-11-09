@@ -1,5 +1,5 @@
 name: website import
-# When dist/ changes on main (wasm/publish.sh), puts the build on the
+# When dist/ changes on the website branch (wasm/publish.sh), puts the build on the
 # website's dev branch right away: clones karazas-group/Karazas-website at dev and
 # runs its build/slicer-import.sh, which minifies, slice-checks, and commits.
 # Cloudflare Pages then deploys dev.karazas.pages.dev.
@@ -9,7 +9,7 @@ name: website import
 # slicer-import workflow).
 on:
   push:
-    branches: [main]
+    branches: [website]
     paths: ['dist/**']
   workflow_dispatch:
 concurrency:
