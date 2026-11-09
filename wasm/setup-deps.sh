@@ -10,7 +10,7 @@
 # model as libslic3r), qhull with -sSUPPORT_LONGJMP=wasm, Boost without
 # context/coroutine/fiber. Steps can be run alone: setup-deps.sh tbb boost ...
 set -e
-W=${KZ_WASM:-$HOME/kz-wasm}; S=$W/deps-src; J=${JOBS:-$(nproc)}
+W=${KZ_WASM:-$HOME/kz-wasm}; S=$W/deps-src; J=${JOBS:-$(nproc)}; REPO=$(cd "$(dirname "$0")/.." && pwd)
 source $W/emsdk/emsdk_env.sh >/dev/null 2>&1
 steps=${*:-tbb qhull boost boostlog headers libnoise}
 
@@ -68,6 +68,8 @@ boostlog() {
 headers() {
   local P=$W/prefix-mt/include; mkdir -p $P
   cp -r $S/boost-1.84.0/boost $P/ 2>/dev/null || true
+  # Faster big-int multiply for the exact Voronoi fallback (same results)
+  patch -p1 -s -d $P < $REPO/patches/boost-voronoi-mul.patch
   cp -r $S/onetbb/include/* $P/
   mkdir -p $P/libqhull_r $P/libqhullcpp
   cp $S/qhull/src/libqhull_r/*.h $P/libqhull_r/; cp $S/qhull/src/libqhullcpp/*.h $P/libqhullcpp/

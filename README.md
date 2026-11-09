@@ -32,6 +32,17 @@ has no extra terms from us. Keep `NOTICE` with every copy.
 
 ## Where it stands
 
+- 2026-11-09, `dev`: three exact speedups (`patches/infill-speed.patch`,
+  `patches/boost-voronoi-mul.patch`), gate still 54/54 bit-identical.
+  Infill connecting used 10 mm grid cells, so every short gyroid segment
+  scanned hundreds of wall edges; cells are now about 2 mm (the visitor only
+  takes minimums and sets flags, so cell size can't change the result).
+  3D path simplify hoists the segment terms out of its inner loop. Boost's
+  exact big-int multiply in the Voronoi fallback skips the products it used
+  to test and drop. Supports off: 9.0 s to 7.2 s per gate rep; infill
+  toolpaths 3.0 to 2.4 s, toolpath simplify 0.65 to 0.2 s. What's left in
+  infill toolpaths is mostly Arachne on narrow solid areas (curved models),
+  and inside that Boost's exact Voronoi arithmetic.
 - 2026-11-09, `dev` branch: the pricer prices supports as normal grid
   supports, not organic trees. Support slices take 12.2 s instead of 26.5 s
   on the 27 gate cases, and parts that need support weigh up to 4 g more

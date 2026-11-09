@@ -1,0 +1,43 @@
+--- a/src/libslic3r/Fill/FillBase.cpp
++++ b/src/libslic3r/Fill/FillBase.cpp
+@@ -1024,7 +1024,11 @@
+     // Make sure that the the grid is big enough for queries against the thick segment.
+ 	grid.set_bbox(boundary_bbox.inflated(distance_colliding * 1.43));
+ 	// Inflate the bounding box by a thick line width.
+-	grid.create(boundary, coord_t(std::max(clip_distance, distance_colliding) + scale_(10.)));
++	// KZ: the visitor below only takes the min of trims and sets consumed flags, so
++	// the result does not depend on which cells find a pair. Cells just need to be
++	// wider than the 2 * distance_colliding band the two traced lines cover; the
++	// old 10 mm cells made every short infill segment scan hundreds of edges.
++	grid.create(boundary, coord_t(2. * std::max(clip_distance, distance_colliding) + scale_(0.5)));
+ 
+     // Visitor for the EdgeGrid to trim boundary_intersections with existing infill lines.
+ 	struct Visitor {
+--- a/src/libslic3r/MultiPoint.cpp
++++ b/src/libslic3r/MultiPoint.cpp
+@@ -483,8 +483,24 @@
+                 double max_dist_sq  = 0.0;
+                 size_t furthest_idx = anchor_idx;
+                 // find point furthest from line seg created by (anchor, floater) and note it
++                // KZ: line_alg::distance_to_squared inlined with the segment terms hoisted
++                // out of the loop; same operations in the same order, so the same doubles.
++                const Vec3d  v  = (*floater - *anchor).cast<double>();
++                const double l2 = v.squaredNorm();
+                 for (size_t i = anchor_idx + 1; i < floater_idx; ++i) {
+-                    double dist_sq = Line3::distance_to_squared(pts[i], *anchor, *floater);
++                    const Vec3d va = (pts[i] - *anchor).cast<double>();
++                    double dist_sq;
++                    if (l2 == 0.0)
++                        dist_sq = va.squaredNorm();
++                    else {
++                        const double t = va.dot(v) / l2;
++                        if (t <= 0.0)
++                            dist_sq = va.squaredNorm();
++                        else if (t >= 1.0)
++                            dist_sq = (pts[i] - *floater).cast<double>().squaredNorm();
++                        else
++                            dist_sq = (t * v - va).squaredNorm();
++                    }
+                     if (dist_sq > max_dist_sq) {
+                         max_dist_sq  = dist_sq;
+                         furthest_idx = i;

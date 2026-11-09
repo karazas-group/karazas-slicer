@@ -1,0 +1,20 @@
+--- a/boost/polygon/detail/voronoi_ctypes.hpp
++++ b/boost/polygon/detail/voronoi_ctypes.hpp
+@@ -556,12 +556,12 @@
+     for (std::size_t shift = 0; shift < static_cast<std::size_t>(this->count_);
+          ++shift) {
+       nxt = 0;
+-      for (std::size_t first = 0; first <= shift; ++first) {
+-        if (first >= sz1)
+-          break;
++      // Same products in the same order as the original loop, which ran
++      // first = 0..shift and skipped first >= sz1 or shift - first >= sz2.
++      const std::size_t lo = shift >= sz2 ? shift - sz2 + 1 : 0;
++      const std::size_t hi = shift < sz1 ? shift : sz1 - 1;
++      for (std::size_t first = lo; first <= hi; ++first) {
+         std::size_t second = shift - first;
+-        if (second >= sz2)
+-          continue;
+         tmp = static_cast<uint64>(c1[first]) * static_cast<uint64>(c2[second]);
+         cur += static_cast<uint32>(tmp);
+         nxt += tmp >> 32;

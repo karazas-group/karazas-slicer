@@ -15,6 +15,7 @@ if [ ! -d upstream ]; then
   patch -p1 -s -d upstream < $REPO/patches/clipper2.patch
   patch -p1 -s -d upstream < $REPO/patches/parallel-stl-load.patch
   patch -p1 -s -d upstream < $REPO/patches/parallel-brim.patch
+  patch -p1 -s -d upstream < $REPO/patches/infill-speed.patch
 fi
 
 cd deps-src
