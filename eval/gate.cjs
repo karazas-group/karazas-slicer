@@ -9,6 +9,7 @@
 // --tol=G accepts a case whose plastic differs by at most G grams (the
 // owner's limit for a change that isn't bit-identical is 0.001 g) and
 // prints the largest difference.
+// EXTRA=key=value,key=value adds overrides, to try a setting against the golden.
 // benchy.stl is not in the repo (11 MB): put it in eval/models/ or set BENCHY.
 const fs = require('fs'), path = require('path');
 const E = __dirname + '/', M = E + 'models/', G = E + 'golden-mm.txt';
@@ -18,7 +19,7 @@ const overrides = (walls, infill, sup) => [
   ['wall_loops', walls], ['sparse_infill_density', infill + '%'], ['enable_support', sup],
   ...(sup ? [['support_type', 'normal(auto)'], ['support_style', 'grid'], ['support_threshold_angle', 35],
     ['support_interface_top_layers', 8], ['support_interface_bottom_layers', 8]] : []),
-].map(([k, v]) => `${k}\t${v}\n`).join('');
+].map(([k, v]) => `${k}\t${v}\n`).join('') + (process.env.EXTRA || '').split(',').filter(Boolean).map((kv) => kv.replace('=', '\t') + '\n').join('');
 (async () => {
   const write = process.argv.includes('--write');
   const tolArg = process.argv.find((a) => a.startsWith('--tol='));
