@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Puts the browser build into dist/ and records where it came from. The
 # website's "slicer import" workflow (Karazas-website,
-# .github/workflows/slicer-import.yml) picks dist/ up from main within the
-# hour, minifies the js, slices a few models with the old and new build and
-# commits it to dev. Commit and push dist/ after this; nothing else needed.
-# Run link_web.sh first, then the gate (eval/gate.cjs, 54/54 identical).
+# .github/workflows/slicer-import.yml) picks dist/ up from the website branch
+# on its next dev push, minifies the js, slices a few models with the old and
+# new build and commits it to dev. Publish from the website branch and push
+# dist/ there; nothing else needed. Run link_web.sh first, then the gate
+# (eval/gate.cjs; --tol=0.05 on the website branch).
 # Usage: publish.sh [path to kz-slicer.js]   (default $OUT/out/web/kz-slicer.js)
 W=${KZ_WASM:-$HOME/kz-wasm}; HERE=$(cd "$(dirname "$0")" && pwd); OUT=${OUT:-$W/build}
 js=${1:-$OUT/out/web/kz-slicer.js}; dir=$(dirname "$js"); repo=$(dirname "$HERE")
