@@ -13,7 +13,9 @@ mkdir -p "$repo/dist"
 cp "$js" "$dir/kz-slicer.wasm" "$repo/dist/"
 {
   echo "built:  $(date -u +%Y-%m-%dT%H:%MZ)"
-  echo "source: $(git -C "$repo" rev-parse --short HEAD) + patches/libslic3r-2.4.2.patch $(sha256sum < "$repo/patches/libslic3r-2.4.2.patch" | cut -c1-12) + patches/clipper2.patch $(sha256sum < "$repo/patches/clipper2.patch" | cut -c1-12)"
+  printf 'source: %s' "$(git -C "$repo" rev-parse --short HEAD)"
+  for p in "$repo"/patches/*.patch; do printf ' + patches/%s %s' "$(basename "$p")" "$(sha256sum < "$p" | cut -c1-12)"; done
+  echo
   echo "wasm:   $(sha256sum < "$repo/dist/kz-slicer.wasm" | cut -c1-12), $(wc -c < "$repo/dist/kz-slicer.wasm") bytes"
 } > "$repo/dist/BUILD"
 cat "$repo/dist/BUILD"
