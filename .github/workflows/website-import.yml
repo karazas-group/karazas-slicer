@@ -1,10 +1,10 @@
 name: website import
 # When dist/ changes on main (wasm/publish.sh), puts the build on the
-# website's dev branch right away: clones blussyya/Karazas-website at dev and
+# website's dev branch right away: clones karazas-group/Karazas-website at dev and
 # runs its build/slicer-import.sh, which minifies, slice-checks, and commits.
 # Cloudflare Pages then deploys dev.karazas.pages.dev.
 # Needs a WEBSITE_TOKEN secret: a fine-grained token with Contents
-# read/write on blussyya/Karazas-website. Without it this only says so; the
+# read/write on karazas-group/Karazas-website. Without it this only says so; the
 # website still imports the build on its next dev push (its own
 # slicer-import workflow).
 on:
@@ -37,7 +37,7 @@ jobs:
       - if: steps.token.outputs.ok == 'true'
         uses: actions/checkout@v4
         with:
-          repository: blussyya/Karazas-website
+          repository: karazas-group/Karazas-website
           ref: dev
           path: website
           token: ${{ secrets.WEBSITE_TOKEN }}
